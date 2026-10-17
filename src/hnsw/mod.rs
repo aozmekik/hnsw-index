@@ -55,7 +55,7 @@ struct Quantized {
 #[derive(Clone, Copy)]
 pub struct SearchOptions<'a> {
     ef: usize,
-    filter: Option<&'a dyn Fn(u64) -> bool>,
+    filter: Option<&'a (dyn Fn(u64) -> bool + Sync)>,
     quantized: bool,
 }
 
@@ -71,8 +71,11 @@ impl<'a> SearchOptions<'a> {
     }
 
     /// Only return keys for which `filter` returns `true`.
+    ///
+    /// The filter must be `Sync` so that one `SearchOptions` value can be
+    /// shared by searches running on several threads.
     #[must_use]
-    pub fn filter(mut self, filter: &'a dyn Fn(u64) -> bool) -> Self {
+    pub fn filter(mut self, filter: &'a (dyn Fn(u64) -> bool + Sync)) -> Self {
         self.filter = Some(filter);
         self
     }
@@ -403,7 +406,7 @@ impl HnswIndex {
         query: &[f32],
         k: usize,
         ef: usize,
-        filter: impl Fn(u64) -> bool,
+        filter: impl Fn(u64) -> bool + Sync,
     ) -> Result<Vec<Neighbor>, Error> {
         self.search_with(query, k, &SearchOptions::new(ef).filter(&filter))
     }

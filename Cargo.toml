@@ -12,12 +12,16 @@ keywords = ["hnsw", "ann", "vector-search", "nearest-neighbor", "simd"]
 categories = ["algorithms", "data-structures"]
 exclude = ["/docs/bench/*.csv", "/.github"]
 
+# `bench = false` keeps libtest's harness out of `cargo bench`, so Criterion
+# flags such as `--save-baseline` reach the Criterion benches only.
 [lib]
 name = "hnsw_index"
+bench = false
 
 [[bin]]
 name = "hnsw-bench"
 path = "src/bin/hnsw-bench/main.rs"
+bench = false
 
 [dependencies]
 parking_lot = "0.12.5"
@@ -53,3 +57,11 @@ undocumented_unsafe_blocks = "warn"
 cast_possible_truncation = "allow"
 # Benchmarks and statistics convert counts to floating point on purpose.
 cast_precision_loss = "allow"
+
+[[bench]]
+name = "kernels"
+harness = false
+
+[[bench]]
+name = "search"
+harness = false
