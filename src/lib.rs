@@ -40,18 +40,24 @@
 //! ```
 
 mod brute;
+mod crc32;
 mod error;
 pub mod eval;
+mod hnsw;
 pub mod kernels;
 mod metric;
 mod neighbor;
+mod params;
+mod quantization;
 pub mod synthetic;
 mod vector;
 
 pub use brute::BruteForceIndex;
 pub use error::{Error, FormatError};
+pub use hnsw::{GraphStats, HnswIndex, SearchOptions};
 pub use metric::Metric;
 pub use neighbor::Neighbor;
+pub use params::{HnswParams, NeighborSelection};
 
 /// Largest supported vector dimension.
 pub const MAX_DIM: usize = 1 << 16;
