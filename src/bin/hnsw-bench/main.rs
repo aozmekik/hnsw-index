@@ -8,6 +8,7 @@
 
 mod alloc;
 mod chart;
+mod cpu;
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -172,19 +173,38 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Config>, 
     Ok(Some(config))
 }
 
-/// Median of `repeats` timings of `f`, in seconds. Returns the result of the
-/// first run.
-fn timed<R>(repeats: usize, mut f: impl FnMut() -> R) -> (R, f64) {
+/// Wall-clock and process CPU seconds of one measurement.
+#[derive(Debug, Clone, Copy)]
+struct Timing {
+    wall: f64,
+    cpu: Option<f64>,
+}
+
+/// Runs `f` `repeats` times and returns the result of the first run with the
+/// median wall-clock and median CPU time (medians taken independently).
+fn timed<R>(repeats: usize, mut f: impl FnMut() -> R) -> (R, Timing) {
     let mut first = None;
-    let mut times = Vec::with_capacity(repeats);
+    let mut walls = Vec::with_capacity(repeats);
+    let mut cpus = Vec::with_capacity(repeats);
     for _ in 0..repeats {
+        let cpu_start = cpu::cpu_seconds();
         let start = Instant::now();
         let out = f();
-        times.push(start.elapsed().as_secs_f64());
+        walls.push(start.elapsed().as_secs_f64());
+        if let (Some(a), Some(b)) = (cpu_start, cpu::cpu_seconds()) {
+            cpus.push(b - a);
+        }
         first.get_or_insert(out);
     }
-    times.sort_by(f64::total_cmp);
-    (first.expect("repeats > 0"), times[times.len() / 2])
+    let median = |v: &mut Vec<f64>| {
+        v.sort_by(f64::total_cmp);
+        v[v.len() / 2]
+    };
+    let timing = Timing {
+        wall: median(&mut walls),
+        cpu: (cpus.len() == repeats).then(|| median(&mut cpus)),
+    };
+    (first.expect("repeats > 0"), timing)
 }
 
 struct BuildRow {
@@ -192,6 +212,7 @@ struct BuildRow {
     label: String,
     threads: usize,
     seconds: f64,
+    cpu_seconds: Option<f64>,
     heap_bytes: usize,
     estimated_bytes: usize,
 }
@@ -203,6 +224,8 @@ struct SearchRow {
     ef: usize,
     recall: f64,
     qps_single: f64,
+    /// Single-thread queries per second of process CPU time.
+    qps_single_cpu: Option<f64>,
     qps_multi: f64,
 }
 
@@ -236,23 +259,24 @@ impl Bench<'_> {
             .expect("valid parameters");
         eprintln!("[{}] building: {label}", kind.name());
         let before = alloc::live_bytes();
-        let start = Instant::now();
-        if parallel {
-            self.pool
-                .install(|| index.insert_batch(&keys, data.base()))
-                .expect("valid data");
-        } else {
-            for (i, &key) in keys.iter().enumerate() {
-                index.insert(key, data.base_vector(i)).expect("valid data");
+        let ((), timing) = timed(1, || {
+            if parallel {
+                self.pool
+                    .install(|| index.insert_batch(&keys, data.base()))
+                    .expect("valid data");
+            } else {
+                for (i, &key) in keys.iter().enumerate() {
+                    index.insert(key, data.base_vector(i)).expect("valid data");
+                }
             }
-        }
-        let seconds = start.elapsed().as_secs_f64();
+        });
         let heap_bytes = alloc::live_bytes().saturating_sub(before);
         self.builds.push(BuildRow {
             dataset: kind,
             label: label.to_string(),
             threads: if parallel { self.config.threads } else { 1 },
-            seconds,
+            seconds: timing.wall,
+            cpu_seconds: timing.cpu,
             heap_bytes,
             estimated_bytes: index.memory_usage(),
         });
@@ -292,13 +316,15 @@ impl Bench<'_> {
                         .sum::<usize>()
                 })
             });
+            let qps_single_cpu = single.cpu.map(|cpu| nq / cpu);
             eprintln!(
-                "[{}] {label}, {}: ef={ef} recall={recall:.4} qps1={:.0} qps{}={:.0}",
+                "[{}] {label}, {}: ef={ef} recall={recall:.4} qps1={:.0} qps1/cpu={:.0} qps{}={:.0}",
                 kind.name(),
                 if quantized { "int8" } else { "f32" },
-                nq / single,
+                nq / single.wall,
+                qps_single_cpu.unwrap_or(f64::NAN),
                 self.config.threads,
-                nq / multi
+                nq / multi.wall
             );
             self.searches.push(SearchRow {
                 dataset: kind,
@@ -310,8 +336,9 @@ impl Bench<'_> {
                 },
                 ef,
                 recall,
-                qps_single: nq / single,
-                qps_multi: nq / multi,
+                qps_single: nq / single.wall,
+                qps_single_cpu,
+                qps_multi: nq / multi.wall,
             });
         }
     }
@@ -331,14 +358,14 @@ impl Bench<'_> {
         let keys: Vec<u64> = (0..data.base_len() as u64).collect();
         let mut exact = BruteForceIndex::new(data.dim(), Metric::L2).expect("valid dim");
         exact.insert_batch(&keys, data.base()).expect("valid data");
-        let (truth, seconds) = timed(1, || {
+        let (truth, timing) = timed(1, || {
             self.pool
                 .install(|| exact.search_batch(data.queries(), c.k))
                 .expect("valid queries")
         });
         drop(exact);
         self.brute_qps
-            .push((kind, data.query_len() as f64 / seconds));
+            .push((kind, data.query_len() as f64 / timing.wall));
 
         let heuristic = NeighborSelection::default();
         let parallel = self.build(kind, &data, "heuristic, parallel", heuristic, true);
@@ -381,7 +408,9 @@ fn markdown(config: &Config, bench: &Bench<'_>) -> String {
     let _ = writeln!(
         out,
         "Synthetic data: {} base + {} disjoint queries, dim {}, seed {}; M={}, efConstruction={}, k={}; \
-         {} thread(s) for parallel runs; median of {} timed run(s); kernel backend: {}; {} {}.\n",
+         {} thread(s) for parallel runs; median of {} timed run(s); kernel backend: {}; {} {}. \
+         Wall-clock throughput depends on what else runs on the machine; CPU-time columns count only \
+         this process's CPU time.\n",
         config.n,
         config.queries,
         config.dim,
@@ -395,36 +424,38 @@ fn markdown(config: &Config, bench: &Bench<'_>) -> String {
         std::env::consts::OS,
         std::env::consts::ARCH,
     );
-    out.push_str("| dataset | build | threads | time (s) | heap bytes / vector (measured) | memory_usage() / vector |\n");
-    out.push_str("|---|---|---:|---:|---:|---:|\n");
+    out.push_str("| dataset | build | threads | wall time (s) | CPU time (s) | heap bytes / vector (measured) | memory_usage() / vector |\n");
+    out.push_str("|---|---|---:|---:|---:|---:|---:|\n");
     for b in &bench.builds {
         let _ = writeln!(
             out,
-            "| {} | {} | {} | {:.2} | {:.0} | {:.0} |",
+            "| {} | {} | {} | {:.2} | {} | {:.0} | {:.0} |",
             b.dataset.name(),
             b.label,
             b.threads,
             b.seconds,
+            fmt_opt(b.cpu_seconds, 2),
             b.heap_bytes as f64 / config.n as f64,
             b.estimated_bytes as f64 / config.n as f64,
         );
     }
     let _ = writeln!(
         out,
-        "\n| dataset | index | distances | ef | recall@{} | QPS, 1 thread | QPS, {t} threads |",
+        "\n| dataset | index | distances | ef | recall@{} | QPS, 1 thread (wall) | QPS, 1 thread (per CPU-second) | QPS, {t} threads (wall) |",
         config.k
     );
-    out.push_str("|---|---|---|---:|---:|---:|---:|\n");
+    out.push_str("|---|---|---|---:|---:|---:|---:|---:|\n");
     for s in &bench.searches {
         let _ = writeln!(
             out,
-            "| {} | {} | {} | {} | {:.4} | {:.0} | {:.0} |",
+            "| {} | {} | {} | {} | {:.4} | {:.0} | {} | {:.0} |",
             s.dataset.name(),
             s.index,
             s.distances,
             s.ef,
             s.recall,
             s.qps_single,
+            fmt_opt(s.qps_single_cpu, 0),
             s.qps_multi
         );
     }
@@ -435,21 +466,26 @@ fn markdown(config: &Config, bench: &Bench<'_>) -> String {
     out
 }
 
+fn fmt_opt(value: Option<f64>, decimals: usize) -> String {
+    value.map_or_else(|| "n/a".to_string(), |v| format!("{v:.decimals$}"))
+}
+
 fn csv(config: &Config, bench: &Bench<'_>) -> String {
     let mut out = format!(
-        "dataset,index,distances,ef,recall_at_{},qps_1_thread,qps_{}_threads\n",
+        "dataset,index,distances,ef,recall_at_{},qps_1_thread_wall,qps_1_thread_cpu,qps_{}_threads_wall\n",
         config.k, config.threads
     );
     for s in &bench.searches {
         let _ = writeln!(
             out,
-            "{},{},{},{},{:.4},{:.1},{:.1}",
+            "{},\"{}\",{},{},{:.4},{:.1},{},{:.1}",
             s.dataset.name(),
             s.index,
             s.distances,
             s.ef,
             s.recall,
             s.qps_single,
+            fmt_opt(s.qps_single_cpu, 1),
             s.qps_multi
         );
     }
@@ -471,7 +507,7 @@ fn charts(config: &Config, bench: &Bench<'_>) -> Vec<(String, String)> {
                 let selection = s.index.split(',').next().unwrap_or_default();
                 let label = format!("{selection} selection, {}", s.distances);
                 let qps = if threads == 1 {
-                    s.qps_single
+                    s.qps_single_cpu.unwrap_or(s.qps_single)
                 } else {
                     s.qps_multi
                 };
@@ -484,8 +520,13 @@ fn charts(config: &Config, bench: &Bench<'_>) -> Vec<(String, String)> {
                 }
             }
             let plural = if threads == 1 { "" } else { "s" };
+            let basis = if threads == 1 && cpu::cpu_seconds().is_some() {
+                " (per CPU-second)"
+            } else {
+                " (wall clock)"
+            };
             let title = format!(
-                "{} {}k x {}-d (synthetic): recall@{} vs QPS, {threads} thread{plural}",
+                "{} {}k x {}-d (synthetic): recall@{} vs QPS, {threads} thread{plural}{basis}",
                 kind.name(),
                 config.n / 1000,
                 config.dim,
