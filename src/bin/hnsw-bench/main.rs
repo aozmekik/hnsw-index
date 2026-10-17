@@ -506,7 +506,12 @@ fn charts(config: &Config, bench: &Bench<'_>) -> Vec<(String, String)> {
             });
             for s in charted {
                 let selection = s.index.split(',').next().unwrap_or_default();
-                let label = format!("{selection} selection, {}", s.distances);
+                let traversal = if s.distances == "f32" {
+                    "f32"
+                } else {
+                    "int8 traversal"
+                };
+                let label = format!("{selection}, {traversal}");
                 let qps = if threads == 1 {
                     s.qps_single_cpu.unwrap_or(s.qps_single)
                 } else {

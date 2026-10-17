@@ -16,3 +16,7 @@
 .vscode/
 *.swp
 *~
+
+# Python tooling (scripts/)
+__pycache__/
+.venv/

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Measure hnswlib's recall on the exact datasets that hnsw-index generates.
+"""Measure hnswlib's recall and speed on the exact datasets hnsw-index generates.
 
 This is a cross-check of the Rust implementation against the reference C++
 implementation by the paper's first author (https://github.com/nmslib/hnswlib).
 It reimplements `hnsw_index::synthetic::Dataset` (SplitMix64 + Box-Muller), so
-both libraries see the same vectors, and prints recall@k per (M, ef).
+both libraries see the same vectors, and prints recall@k per (M, ef) together
+with single-threaded queries per CPU-second (process CPU time, so the figure is
+comparable with the "per CPU-second" column of `hnsw-bench`).
 
 hnswlib and numpy are not dependencies of this repository; install them in a
 throwaway virtual environment:
@@ -19,6 +21,7 @@ Compare with the `recall@10` lines printed by
 import argparse
 import importlib.metadata
 import math
+import time
 
 import hnswlib
 import numpy as np
@@ -83,12 +86,13 @@ def main() -> None:
     parser.add_argument("--n", type=int, default=10_000)
     parser.add_argument("--queries", type=int, default=200)
     parser.add_argument("--dim", type=int, default=128)
-    parser.add_argument("--clusters", type=int, default=50)
+    parser.add_argument("--clusters", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--m", type=int, nargs="+", default=[16, 32])
     parser.add_argument("--ef", type=int, nargs="+", default=[16, 32, 64, 100, 128, 256])
     parser.add_argument("--ef-construction", type=int, default=200)
+    parser.add_argument("--repeats", type=int, default=3)
     args = parser.parse_args()
 
     if args.dataset == "gaussian":
@@ -109,12 +113,20 @@ def main() -> None:
         index = hnswlib.Index(space="l2", dim=args.dim)
         index.init_index(max_elements=args.n, M=m, ef_construction=args.ef_construction, random_seed=100)
         index.set_num_threads(1)
+        start = time.process_time()
         index.add_items(base, np.arange(args.n))
+        print(f"M={m:<3} single-threaded build: {time.process_time() - start:.2f} CPU seconds")
         for ef in args.ef:
             index.set_ef(ef)
-            labels, _ = index.knn_query(queries, k=args.k)
+            index.knn_query(queries, k=args.k)  # warm-up
+            cpu = []
+            for _ in range(args.repeats):
+                start = time.process_time()
+                labels, _ = index.knn_query(queries, k=args.k)
+                cpu.append(time.process_time() - start)
+            qps = len(queries) / sorted(cpu)[len(cpu) // 2]
             recall = np.mean([len(set(l) & set(t)) / args.k for l, t in zip(labels, truth)])
-            print(f"M={m:<3} ef={ef:<4} recall@{args.k}={recall:.4f}")
+            print(f"M={m:<3} ef={ef:<4} recall@{args.k}={recall:.4f} qps_per_cpu_second={qps:.0f}")
 
 
 if __name__ == "__main__":
