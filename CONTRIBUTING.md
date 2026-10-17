@@ -31,7 +31,7 @@ and every `unsafe` block needs a `// SAFETY:` comment.
 ```sh
 cargo run --release --example quickstart        # also: filtered_search, persistence, quantization
 cargo run --release --bin hnsw-bench -- --help
-cargo run --release --bin hnsw-bench -- --quick # smoke run, about a minute
+cargo run --release --bin hnsw-bench -- --quick # smoke run on 20k vectors
 cargo bench --bench kernels                     # Criterion: distance kernels per backend
 cargo bench --bench search                      # Criterion: single-query latency
 ```
