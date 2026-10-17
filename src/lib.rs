@@ -40,8 +40,11 @@
 //! ```
 
 mod error;
+pub mod kernels;
+mod metric;
 
 pub use error::{Error, FormatError};
+pub use metric::Metric;
 
 /// Largest supported vector dimension.
 pub const MAX_DIM: usize = 1 << 16;
