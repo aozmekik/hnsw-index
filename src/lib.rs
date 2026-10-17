@@ -39,12 +39,19 @@
 //! # Ok::<(), hnsw_index::Error>(())
 //! ```
 
+mod brute;
 mod error;
+pub mod eval;
 pub mod kernels;
 mod metric;
+mod neighbor;
+pub mod synthetic;
+mod vector;
 
+pub use brute::BruteForceIndex;
 pub use error::{Error, FormatError};
 pub use metric::Metric;
+pub use neighbor::Neighbor;
 
 /// Largest supported vector dimension.
 pub const MAX_DIM: usize = 1 << 16;
