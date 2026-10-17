@@ -18,7 +18,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before
 - Squared L2, inner product and cosine metrics; scalar, auto-vectorised, NEON
   and AVX2+FMA kernels with runtime detection.
 - Filtered search, tombstone deletion, `compact()`, parallel
-  `insert_batch` (rayon), concurrent `&self` search, `search_batch`.
+  `insert_batch` (rayon), `reserve`, concurrent `&self` search,
+  `search_batch`.
 - Optional int8 scalar quantization with exact re-ranking.
 - Versioned, CRC-32 checksummed file format with a validating loader.
 - `BruteForceIndex` for exact ground truth, `eval::recall_at_k`, seeded

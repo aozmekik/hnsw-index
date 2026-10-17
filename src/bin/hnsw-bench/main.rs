@@ -265,6 +265,7 @@ impl Bench<'_> {
                     .install(|| index.insert_batch(&keys, data.base()))
                     .expect("valid data");
             } else {
+                index.reserve(keys.len());
                 for (i, &key) in keys.iter().enumerate() {
                     index.insert(key, data.base_vector(i)).expect("valid data");
                 }

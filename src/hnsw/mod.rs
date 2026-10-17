@@ -261,6 +261,17 @@ impl HnswIndex {
         self.key_to_id.get(&key).map(|&id| self.vector(id))
     }
 
+    /// Reserves capacity for at least `additional` more vectors, so that a
+    /// sequence of [`insert`](Self::insert) calls does not reallocate.
+    /// ([`insert_batch`](Self::insert_batch) reserves exactly what it needs.)
+    pub fn reserve(&mut self, additional: usize) {
+        self.reserve_nodes(additional);
+        self.key_to_id.reserve(additional);
+        if let Some(q) = &mut self.quantized {
+            q.codes.reserve(additional * self.dim);
+        }
+    }
+
     /// Inserts one vector and links it into the graph.
     ///
     /// Inserting a key that was previously [`remove`](Self::remove)d is

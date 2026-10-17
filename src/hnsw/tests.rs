@@ -358,6 +358,21 @@ fn inner_product_and_cosine_rank_correctly() {
 }
 
 #[test]
+fn reserve_avoids_reallocation_during_inserts() {
+    let data = Dataset::gaussian(300, 1, 8, 1);
+    let mut index = HnswIndex::new(8, Metric::L2, HnswParams::default()).unwrap();
+    index.reserve(300);
+    let (vectors, keys) = (index.vectors.capacity(), index.keys.capacity());
+    for i in 0..300 {
+        index.insert(i as u64, data.base_vector(i)).unwrap();
+    }
+    assert_eq!(
+        (index.vectors.capacity(), index.keys.capacity()),
+        (vectors, keys)
+    );
+}
+
+#[test]
 fn memory_usage_accounts_for_vectors_and_links() {
     let data = Dataset::gaussian(1000, 1, 32, 1);
     let index = build(&data, Metric::L2, HnswParams::default(), false);
