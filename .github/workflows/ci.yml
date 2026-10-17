@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  lint:
+    name: Format, docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all --check
+      - name: rustdoc
+        run: cargo doc --no-deps --locked
+
+  test:
+    name: Clippy, test, examples (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # x86_64 Linux and Windows exercise the AVX2 kernels; arm64 Linux and
+        # macOS exercise the NEON kernels.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy (per target, since SIMD code is cfg-gated by architecture)
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --all-targets --locked
+      - name: Doc tests
+        run: cargo test --doc --locked
+      - name: Examples
+        shell: bash
+        run: |
+          for example in quickstart filtered_search persistence quantization; do
+            cargo run --release --locked --example "$example"
+          done
+      - name: Benchmark smoke run
+        run: cargo run --release --locked --bin hnsw-bench -- --quick --dataset gaussian --skip-sequential
+      - name: Criterion benches compile
+        run: cargo bench --no-run --locked
+
+  msrv:
+    name: MSRV (Rust 1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: "1.88"
+      - uses: Swatinem/rust-cache@v2
+      - name: Check all targets
+        run: cargo check --all-targets --locked
