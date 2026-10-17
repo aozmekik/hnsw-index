@@ -1,0 +1,18 @@
+# Build output
+/target/
+
+# Coverage and profiling artefacts
+*.profraw
+*.profdata
+/lcov.info
+/coverage/
+
+# Scratch index files written by local experiments
+*.hnsw
+
+# Editors and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
