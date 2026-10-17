@@ -394,9 +394,9 @@ impl HnswIndex {
     /// The filter is applied during traversal (rejected nodes still guide the
     /// search), not after it, so up to `k` matching results are returned
     /// even when most keys are rejected. Very selective filters make the
-    /// search visit a large part of the graph; below roughly 1% selectivity,
-    /// a [`BruteForceIndex`](crate::BruteForceIndex) over the matching subset
-    /// is usually faster.
+    /// search visit a large part of the graph; for those, an exact scan of
+    /// the matching subset (for example with a
+    /// [`BruteForceIndex`](crate::BruteForceIndex)) can be faster.
     ///
     /// # Errors
     ///

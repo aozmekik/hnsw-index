@@ -456,47 +456,55 @@ fn csv(config: &Config, bench: &Bench<'_>) -> String {
     out
 }
 
+/// One chart per dataset and thread count: recall vs QPS for the primary
+/// index (f32 and int8 traversal) and the simple-selection index.
 fn charts(config: &Config, bench: &Bench<'_>) -> Vec<(String, String)> {
     let mut out = Vec::new();
-    for (file, multi) in [
-        ("recall-qps-1-thread.svg", false),
-        ("recall-qps-multi-thread.svg", true),
-    ] {
-        let mut series: Vec<chart::Series> = Vec::new();
-        let charted = bench
-            .searches
-            .iter()
-            .filter(|s| s.index == bench.primary_label || s.index.starts_with("simple"));
-        for s in charted {
-            let label = format!("{}, {}, {}", s.dataset.name(), s.index, s.distances)
-                .replace("heuristic, ", "")
-                .replace(" + f32 re-rank", "");
-            let qps = if multi { s.qps_multi } else { s.qps_single };
-            match series.iter_mut().find(|x| x.label == label) {
-                Some(x) => x.points.push((s.recall, qps)),
-                None => series.push(chart::Series {
-                    label,
-                    points: vec![(s.recall, qps)],
-                }),
+    for &kind in &config.datasets {
+        for threads in [1, config.threads] {
+            let mut series: Vec<chart::Series> = Vec::new();
+            let charted = bench.searches.iter().filter(|s| {
+                s.dataset == kind
+                    && (s.index == bench.primary_label || s.index.starts_with("simple"))
+            });
+            for s in charted {
+                let selection = s.index.split(',').next().unwrap_or_default();
+                let label = format!("{selection} selection, {}", s.distances);
+                let qps = if threads == 1 {
+                    s.qps_single
+                } else {
+                    s.qps_multi
+                };
+                match series.iter_mut().find(|x| x.label == label) {
+                    Some(x) => x.points.push((s.recall, qps)),
+                    None => series.push(chart::Series {
+                        label,
+                        points: vec![(s.recall, qps)],
+                    }),
+                }
             }
+            let plural = if threads == 1 { "" } else { "s" };
+            let title = format!(
+                "{} {}k x {}-d (synthetic): recall@{} vs QPS, {threads} thread{plural}",
+                kind.name(),
+                config.n / 1000,
+                config.dim,
+                config.k
+            );
+            let subtitle = format!(
+                "M={}, efConstruction={}, ef in {:?}; {} {}, {} kernels",
+                config.m,
+                config.ef_construction,
+                config.efs,
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                hnsw_index::kernels::Kernels::best().backend()
+            );
+            out.push((
+                format!("recall-qps-{}-{threads}-thread{plural}.svg", kind.name()),
+                chart::render(&title, &subtitle, &format!("recall@{}", config.k), &series),
+            ));
         }
-        let threads = if multi { config.threads } else { 1 };
-        let title = format!(
-            "Recall@{} vs throughput, {} threads (synthetic data)",
-            config.k, threads
-        );
-        let subtitle = format!(
-            "{}k x {}-d, M={}, efConstruction={}, ef in {:?}; hnsw-bench, Apple M1 Pro",
-            config.n / 1000,
-            config.dim,
-            config.m,
-            config.ef_construction,
-            config.efs
-        );
-        out.push((
-            file.to_string(),
-            chart::render(&title, &subtitle, &format!("recall@{}", config.k), &series),
-        ));
     }
     out
 }
