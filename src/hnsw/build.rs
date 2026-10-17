@@ -33,6 +33,11 @@ impl HnswIndex {
     /// Takes `&self` so that many nodes can be linked in parallel: neighbour
     /// lists are atomics guarded by per-node locks (see `graph.rs`), and the
     /// entry point is an atomic word updated under `promotion`.
+    ///
+    /// Deadlock freedom: a thread holds at most one node lock at a time (in
+    /// `install_own_neighbors`, `connect` and `write_shrunk`, none of which
+    /// takes another lock), and `promotion` is only ever acquired before any
+    /// node lock. Reads never lock.
     pub(super) fn link(&self, id: u32) {
         let level = usize::from(self.levels[id as usize]);
         let query = self.vector(id);
@@ -61,22 +66,6 @@ impl HnswIndex {
         }
         let (entry_id, top) = unpack_entry(entry).expect("entry point exists");
 
-        // Hold this node's lock for the whole insertion (as hnswlib does), so
-        // that a concurrent `connect(id, ..)` cannot slip an edge into a list
-        // this function is about to overwrite. The node is not discoverable
-        // yet, so nobody else holds or waits for this lock now.
-        //
-        // Deadlock freedom: a thread holding its own node's lock waits only
-        // in `connect`, for a neighbour found on the layer it is processing.
-        // Node B is found on layer l only after B started connecting on l,
-        // which is after B searched l. If A waited for B on layer l while B
-        // waited for A on layer l', then B connected on l before A searched
-        // l, and A connected on l' before B searched l'. With l = l' that is
-        // a cycle in time; otherwise one of them would have to be on a layer
-        // it has not reached yet, since both descend top-down. The promotion
-        // lock is always taken before, never while holding, a node lock.
-        let _own_lock = self.locks[id as usize].lock();
-
         let mut ep = Candidate::new(distance(entry_id), entry_id);
         for layer in (level + 1..=top).rev() {
             ep = self.greedy_closest(ep, layer, &distance);
@@ -89,7 +78,7 @@ impl HnswIndex {
                 let found =
                     self.search_layer(scratch, &entry_points, ef, layer, &distance, &|n| n != id);
                 let selected = self.select_neighbors(id, query, &found, self.params.m(), layer);
-                self.links.set(id, layer, &selected);
+                self.install_own_neighbors(id, &selected, layer);
                 for &neighbor in &selected {
                     self.connect(neighbor, id, layer);
                 }
@@ -104,6 +93,29 @@ impl HnswIndex {
         }
     }
 
+    /// Writes the new node's own neighbour list on `layer`.
+    ///
+    /// The list is normally still empty, but a concurrent insertion may
+    /// already have linked back to this node: nodes carried over as entry
+    /// points from the layer above are visible before they are connected on
+    /// the current layer. Those back-links are merged in rather than
+    /// overwritten, shrinking with the selection strategy if over capacity.
+    fn install_own_neighbors(&self, id: u32, selected: &[u32], layer: usize) {
+        let _lock = self.locks[id as usize].lock();
+        let mut merged = Vec::with_capacity(self.links.capacity(layer) + selected.len());
+        self.links.read_into(id, layer, &mut merged);
+        if merged.is_empty() {
+            self.links.set(id, layer, selected);
+            return;
+        }
+        for &n in selected {
+            if !merged.contains(&n) {
+                merged.push(n);
+            }
+        }
+        self.write_shrunk(id, &merged, layer);
+    }
+
     /// Adds the edge `node → new` on `layer`, shrinking `node`'s list with the
     /// selection strategy when it is full (Algorithm 1, lines 11–16).
     fn connect(&self, node: u32, new: u32, layer: usize) {
@@ -113,15 +125,25 @@ impl HnswIndex {
         if current.contains(&new) || self.links.try_push(node, layer, new) {
             return;
         }
+        current.push(new);
+        self.write_shrunk(node, &current, layer);
+    }
+
+    /// Sets `node`'s list on `layer` to `ids`, applying the selection strategy
+    /// if `ids` exceeds the layer capacity. The caller holds `node`'s lock.
+    fn write_shrunk(&self, node: u32, ids: &[u32], layer: usize) {
+        let capacity = self.links.capacity(layer);
+        if ids.len() <= capacity {
+            self.links.set(node, layer, ids);
+            return;
+        }
         let base = self.vector(node);
-        let mut candidates: Vec<Candidate> = current
+        let mut candidates: Vec<Candidate> = ids
             .iter()
-            .chain(std::iter::once(&new))
             .map(|&c| Candidate::new(self.metric.distance(&self.kernels, base, self.vector(c)), c))
             .collect();
         candidates.sort_unstable();
-        let selected =
-            self.select_neighbors(node, base, &candidates, self.links.capacity(layer), layer);
+        let selected = self.select_neighbors(node, base, &candidates, capacity, layer);
         self.links.set(node, layer, &selected);
     }
 
