@@ -10,7 +10,7 @@ repository = "https://github.com/aozmekik/hnsw-index"
 readme = "README.md"
 keywords = ["hnsw", "ann", "vector-search", "nearest-neighbor", "simd"]
 categories = ["algorithms", "data-structures"]
-exclude = ["/docs/bench/*.csv", "/.github"]
+exclude = ["/.github", "/docs/bench", "/scripts"]
 
 # `bench = false` keeps libtest's harness out of `cargo bench`, so Criterion
 # flags such as `--save-baseline` reach the Criterion benches only.
