@@ -113,7 +113,8 @@ impl BruteForceIndex {
         Ok(())
     }
 
-    /// The exact `k` nearest neighbours, closest first.
+    /// The exact `k` nearest neighbours, closest first. Returns every vector
+    /// if `k` exceeds [`len`](Self::len).
     ///
     /// # Errors
     ///
@@ -137,6 +138,8 @@ impl BruteForceIndex {
         if k == 0 {
             return Ok(Vec::new());
         }
+        // At most `len` results can come back, whatever `k` asks for.
+        let k = k.min(self.len());
         let mut heap = BinaryHeap::with_capacity(k + 1);
         for (&key, v) in self.keys.iter().zip(self.vectors.chunks_exact(self.dim)) {
             if !filter(key) {
@@ -220,6 +223,18 @@ mod tests {
         assert_eq!(hits[0].distance, 1.0);
         assert_eq!(index().search(&[4.0], 0).unwrap(), []);
         assert_eq!(index().search(&[4.0], 100).unwrap().len(), 4);
+    }
+
+    #[test]
+    fn huge_k_neither_overflows_nor_over_allocates() {
+        let idx = index();
+        for k in [usize::MAX, 1 << 60] {
+            assert_eq!(idx.search(&[4.0], k).unwrap().len(), 4);
+            assert_eq!(
+                idx.search_filtered(&[4.0], k, |key| key > 4).unwrap().len(),
+                2
+            );
+        }
     }
 
     #[test]
