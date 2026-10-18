@@ -109,6 +109,7 @@ impl fmt::Debug for SearchOptions<'_> {
 
 /// Summary statistics of the graph structure.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct GraphStats {
     /// Nodes stored, tombstones included.
     pub nodes: usize,

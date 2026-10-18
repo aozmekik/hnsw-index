@@ -139,6 +139,7 @@ proptest! {
                     Metric::L2 => kernels.l2_squared(&q, stored),
                     Metric::InnerProduct => -kernels.dot(&q, stored),
                     Metric::Cosine => 1.0 - kernels.dot(&q, stored),
+                    other => unreachable!("no reference distance for {other}"),
                 };
                 // Bit-identical: the index must report the exact distance.
                 prop_assert_eq!(hit.distance.to_bits(), want.to_bits());

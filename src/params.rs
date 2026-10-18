@@ -17,6 +17,7 @@ pub(crate) const MAX_LEVEL_MULTIPLIER: f64 = 10.0;
 /// SELECT-NEIGHBORS-SIMPLE (Algorithm 3), `Heuristic` is
 /// SELECT-NEIGHBORS-HEURISTIC (Algorithm 4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum NeighborSelection {
     /// Keep the `M` nearest candidates.
     Simple,

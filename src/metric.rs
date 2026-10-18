@@ -7,6 +7,7 @@ use crate::kernels::Kernels;
 /// How the distance between two vectors is measured. Smaller is closer for
 /// every metric, so all indexes in this crate rank results in ascending order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Metric {
     /// Squared Euclidean distance `Σ (aᵢ − bᵢ)²`.
     ///
