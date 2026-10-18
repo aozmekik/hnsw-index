@@ -60,6 +60,12 @@ pub use metric::Metric;
 pub use neighbor::Neighbor;
 pub use params::{HnswParams, NeighborSelection};
 
+/// Runs the README's Rust example as a doctest, so it cannot drift from the
+/// API.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
+
 /// Largest supported vector dimension.
 pub const MAX_DIM: usize = 1 << 16;
 

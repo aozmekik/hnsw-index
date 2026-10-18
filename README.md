@@ -63,8 +63,10 @@ hnsw-index = { git = "https://github.com/aozmekik/hnsw-index" }
 The benchmark binary installs with
 
 ```sh
-cargo install --git https://github.com/aozmekik/hnsw-index hnsw-bench
+cargo install --locked --git https://github.com/aozmekik/hnsw-index --bin hnsw-bench
 ```
+
+(CI runs the same command against a local clone.)
 
 Requires Rust 1.88 or newer (edition 2024).
 
@@ -88,12 +90,16 @@ fn main() -> Result<(), hnsw_index::Error> {
     assert_eq!(even[0].key, 2);
 
     index.remove(1);
-    index.write_to(std::fs::File::create("vectors.hnsw")?)?;
-    let loaded = HnswIndex::read_from(std::fs::File::open("vectors.hnsw")?)?;
+    let path = std::env::temp_dir().join("quickstart.hnsw");
+    index.write_to(std::fs::File::create(&path)?)?;
+    let loaded = HnswIndex::read_from(std::fs::File::open(&path)?)?;
     assert_eq!(loaded.search(&[1.0, 0.05, 0.0], 1, 32)?[0].key, 3);
     Ok(())
 }
 ```
+
+This example is compiled and run by `cargo test --doc`, so it cannot drift
+from the API.
 
 Runnable examples live in [`examples/`](examples): `quickstart`,
 `filtered_search`, `persistence` and `quantization`

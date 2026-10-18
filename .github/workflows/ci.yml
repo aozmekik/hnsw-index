@@ -20,10 +20,14 @@ env:
 
 jobs:
   lint:
-    name: Format, docs
+    name: Format, docs, install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history, so that cargo can clone this checkout as a git
+          # source in the install step.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -33,6 +37,10 @@ jobs:
         run: cargo fmt --all --check
       - name: rustdoc
         run: cargo doc --no-deps --locked
+      - name: README install command (against this checkout)
+        run: |
+          cargo install --locked --git "file://$GITHUB_WORKSPACE" --bin hnsw-bench --root "$RUNNER_TEMP/install"
+          "$RUNNER_TEMP/install/bin/hnsw-bench" --help
 
   test:
     name: Clippy, test, examples (${{ matrix.os }})
