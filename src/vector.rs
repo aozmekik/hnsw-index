@@ -4,10 +4,21 @@ use std::borrow::Cow;
 
 use crate::{Error, Metric};
 
+/// Largest accepted squared Euclidean norm of a vector or query.
+///
+/// For vectors `a` and `b` with `‖a‖², ‖b‖² ≤ f32::MAX / 8`, Cauchy–Schwarz
+/// bounds `|a · b|`, and every partial sum of it, by `f32::MAX / 8`, and
+/// `‖a − b‖² ≤ 2‖a‖² + 2‖b‖²` by `f32::MAX / 2`. The remaining factor of two
+/// covers rounding in any summation order (the relative error of an `f32` sum
+/// of at most [`MAX_DIM`](crate::MAX_DIM) terms is below 1%). So every
+/// exact distance between accepted vectors is finite, for every metric and
+/// kernel backend.
+pub(crate) const MAX_SQUARED_NORM: f64 = f32::MAX as f64 / 8.0;
+
 /// Checks length and finiteness and returns the squared norm (in `f64`).
 ///
-/// A vector whose squared norm exceeds `f32::MAX` is rejected even though its
-/// components are finite: distances involving it would overflow to infinity.
+/// A vector whose squared norm exceeds [`MAX_SQUARED_NORM`] is rejected even
+/// though its components are finite, so that no distance overflows.
 pub(crate) fn check(dim: usize, vector: &[f32]) -> Result<f64, Error> {
     if vector.len() != dim {
         return Err(Error::DimensionMismatch {
@@ -22,7 +33,7 @@ pub(crate) fn check(dim: usize, vector: &[f32]) -> Result<f64, Error> {
         }
         norm_sq += f64::from(x) * f64::from(x);
     }
-    if norm_sq > f64::from(f32::MAX) {
+    if norm_sq > MAX_SQUARED_NORM {
         return Err(Error::NonFiniteVector);
     }
     Ok(norm_sq)
@@ -124,6 +135,27 @@ mod tests {
             assert!(prepare_query(metric, 2, v).is_err(), "{v:?}");
         }
         assert_eq!(out, vec![1.0]);
+    }
+
+    #[test]
+    fn distances_between_accepted_vectors_are_finite() {
+        use crate::kernels::{Backend, Kernels};
+        for dim in [1, 7, 128, 1024] {
+            // The largest accepted vectors, pointing in opposite directions:
+            // the worst case for both the dot product and the L2 distance.
+            let c = ((MAX_SQUARED_NORM / dim as f64).sqrt() * 0.9999) as f32;
+            let (a, b) = (vec![c; dim], vec![-c; dim]);
+            assert!(check(dim, &a).is_ok() && check(dim, &b).is_ok());
+            for backend in Backend::available() {
+                let k = Kernels::new(backend).unwrap();
+                assert!(k.l2_squared(&a, &b).is_finite(), "{backend}, dim {dim}");
+                assert!(k.dot(&a, &b).is_finite(), "{backend}, dim {dim}");
+                assert!(k.dot(&a, &a).is_finite(), "{backend}, dim {dim}");
+            }
+        }
+        // Accepted by an `f32::MAX` bound, but two such vectors of opposite
+        // sign are at an L2 distance of 6.8e38, which overflows.
+        assert!(matches!(check(1, &[1.3e19]), Err(Error::NonFiniteVector)));
     }
 
     #[test]

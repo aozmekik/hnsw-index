@@ -23,7 +23,9 @@ pub enum Error {
         /// Human-readable description of the accepted range.
         reason: &'static str,
     },
-    /// A vector contains NaN or infinity, or its squared norm overflows `f32`.
+    /// A vector contains NaN or infinity, or its squared norm exceeds
+    /// `f32::MAX / 8`, the bound that keeps every distance between accepted
+    /// vectors finite.
     NonFiniteVector,
     /// A zero vector was supplied to a cosine index, where it has no direction.
     ZeroVector,
