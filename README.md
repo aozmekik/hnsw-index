@@ -177,9 +177,10 @@ smaller is always closer.
   allocator. The quick start above runs as a doctest.
 - **Recall regression** (`tests/recall.rs`; fixed seed, synthetic Gaussian
   10k × 128, 200 queries, `efConstruction = 200`): recall@10 ≥ 0.95 at
-  `ef = 100` with `M = 32` (measured: 0.9620). With `M = 16` the same data
-  gives 0.8900 and hnswlib 0.8890; that test checks that the crate stays
-  within 0.02 of hnswlib.
+  `ef = 100` with `M = 32`. With `M = 16` the same data gives lower recall,
+  for hnswlib too, so that test checks that the crate stays within 0.02 of
+  hnswlib's 0.8890. On the M1 Pro, `cargo test --test recall -- --nocapture`
+  prints 0.9620 and 0.8900.
 - **Recall compared with hnswlib**: on identical vectors, recall@10 is within
   0.01 of hnswlib 0.8.0 at every `ef ≥ 32` in all four configurations
   measured (10k Gaussian with `M = 16` and `M = 32`; 100k Gaussian and
