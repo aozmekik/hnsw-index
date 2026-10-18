@@ -1,4 +1,5 @@
-//! Checks `HnswIndex::memory_usage` against bytes actually allocated.
+//! Checks `HnswIndex::memory_usage` against bytes actually allocated, and the
+//! peak memory of `compact`.
 //!
 //! This file is its own test binary with a single test, so the counting
 //! allocator sees no allocations from concurrently running tests.
@@ -12,6 +13,12 @@ use hnsw_index::{HnswIndex, HnswParams, Metric};
 struct Counting;
 
 static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
+static PEAK_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+fn grew(size: usize) {
+    let live = LIVE_BYTES.fetch_add(size, Ordering::Relaxed) + size;
+    PEAK_BYTES.fetch_max(live, Ordering::Relaxed);
+}
 
 // SAFETY: every method forwards to `System` with the caller's arguments, so
 // `System`'s guarantees carry over; the counter has no effect on allocation.
@@ -21,7 +28,7 @@ unsafe impl GlobalAlloc for Counting {
         // SAFETY: forwarded unchanged; the caller upholds `alloc`'s contract.
         let ptr = unsafe { System.alloc(layout) };
         if !ptr.is_null() {
-            LIVE_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            grew(layout.size());
         }
         ptr
     }
@@ -30,7 +37,7 @@ unsafe impl GlobalAlloc for Counting {
         // SAFETY: forwarded unchanged; the caller upholds the contract.
         let ptr = unsafe { System.alloc_zeroed(layout) };
         if !ptr.is_null() {
-            LIVE_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            grew(layout.size());
         }
         ptr
     }
@@ -45,7 +52,7 @@ unsafe impl GlobalAlloc for Counting {
         // SAFETY: forwarded unchanged; the caller upholds the contract.
         let new = unsafe { System.realloc(ptr, layout, new_size) };
         if !new.is_null() {
-            LIVE_BYTES.fetch_add(new_size, Ordering::Relaxed);
+            grew(new_size);
             LIVE_BYTES.fetch_sub(layout.size(), Ordering::Relaxed);
         }
         new
@@ -56,7 +63,7 @@ unsafe impl GlobalAlloc for Counting {
 static ALLOCATOR: Counting = Counting;
 
 #[test]
-fn memory_usage_is_within_ten_percent_of_allocated_bytes() {
+fn memory_usage_matches_allocations_and_compaction_copies_vectors_once() {
     let data = Dataset::gaussian(20_000, 10, 64, 3);
     let keys: Vec<u64> = (0..data.base_len() as u64).collect();
     let before = LIVE_BYTES.load(Ordering::Relaxed);
@@ -70,4 +77,21 @@ fn memory_usage_is_within_ten_percent_of_allocated_bytes() {
     let ratio = estimated as f64 / measured as f64;
     eprintln!("measured {measured} B, estimated {estimated} B, ratio {ratio:.3}");
     assert!((0.9..=1.1).contains(&ratio), "ratio {ratio}");
+
+    // While compacting, the old index, the new one and the list of live keys
+    // and ids exist side by side; nothing else of size proportional to the
+    // index may be allocated (an extra copy of the live vectors would add a
+    // third of the new index here).
+    for key in (0..keys.len() as u64).filter(|k| k % 3 == 0) {
+        index.remove(key);
+    }
+    let live = index.len();
+    let before = LIVE_BYTES.load(Ordering::Relaxed);
+    PEAK_BYTES.store(before, Ordering::Relaxed);
+    index.compact();
+    let peak = PEAK_BYTES.load(Ordering::Relaxed) - before;
+    let fresh = index.memory_usage();
+    let bound = fresh + live * (8 + 4) + fresh / 20;
+    eprintln!("compaction: peak growth {peak} B, new index {fresh} B, bound {bound} B");
+    assert!(peak <= bound, "peak {peak} > bound {bound}");
 }

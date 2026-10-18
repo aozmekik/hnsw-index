@@ -266,6 +266,7 @@ impl HnswIndex {
     /// sequence of [`insert`](Self::insert) calls does not reallocate.
     /// ([`insert_batch`](Self::insert_batch) reserves exactly what it needs.)
     pub fn reserve(&mut self, additional: usize) {
+        self.vectors.reserve(additional * self.dim);
         self.reserve_nodes(additional);
         self.key_to_id.reserve(additional);
         if let Some(q) = &mut self.quantized {
@@ -329,14 +330,16 @@ impl HnswIndex {
 
     /// Appends already-validated vectors and links them in parallel.
     fn insert_prepared_parallel(&mut self, keys: &[u64], prepared: &[f32]) {
-        if keys.is_empty() {
-            return;
-        }
         let first = self.append_nodes(keys, prepared);
-        let end = first + keys.len() as u32;
+        self.link_parallel(first);
+    }
+
+    /// Links the nodes from `first` to the last one in parallel.
+    fn link_parallel(&mut self, first: u32) {
+        let end = self.node_count() as u32;
         let mut next = first;
-        if self.entry_point().is_none() {
-            self.link(first);
+        if next < end && self.entry_point().is_none() {
+            self.link(next);
             next += 1;
         }
         let this = &*self;
@@ -364,8 +367,15 @@ impl HnswIndex {
     /// Keys and parameters are kept; node levels are re-sampled and vectors
     /// are re-linked in parallel as by [`insert_batch`](Self::insert_batch).
     /// If quantization is enabled, the quantizer is retrained on the live
-    /// vectors. Costs about as much as building a new index and temporarily
-    /// needs memory for both copies. Does nothing if there are no tombstones.
+    /// vectors. Costs about as much as building a new index, and until it
+    /// returns the old and the new index exist side by side (live vectors are
+    /// copied once, straight into the new one). Does nothing if there are no
+    /// tombstones.
+    ///
+    /// When to call it depends on the workload: tombstones still cost memory
+    /// and are still expanded by every search that reaches them, so search
+    /// gets slower as their share ([`deleted_len`](Self::deleted_len)
+    /// relative to `len`) grows.
     pub fn compact(&mut self) {
         if self.deleted_len() == 0 {
             return;
@@ -374,12 +384,13 @@ impl HnswIndex {
             .filter(|&id| !self.deleted[id as usize])
             .collect();
         let keys: Vec<u64> = live.iter().map(|&id| self.keys[id as usize]).collect();
-        let mut vectors = Vec::with_capacity(live.len() * self.dim);
-        for &id in &live {
-            vectors.extend_from_slice(self.vector(id));
-        }
         let mut fresh = Self::empty(self.dim, self.metric, self.params.clone());
-        fresh.insert_prepared_parallel(&keys, &vectors);
+        fresh.vectors.reserve_exact(live.len() * self.dim);
+        for &id in &live {
+            fresh.vectors.extend_from_slice(self.vector(id));
+        }
+        fresh.push_nodes(&keys);
+        fresh.link_parallel(0);
         if self.quantized.is_some() {
             fresh.enable_quantization();
         }
@@ -702,12 +713,13 @@ impl HnswIndex {
         unpack_entry(self.entry.load(Ordering::Acquire))
     }
 
+    /// Reserves room for `additional` more nodes in every per-node column
+    /// except the vectors.
     fn reserve_nodes(&mut self, additional: usize) {
         self.keys.reserve(additional);
         self.levels.reserve(additional);
         self.deleted.reserve(additional);
         self.locks.reserve(additional);
-        self.vectors.reserve(additional * self.dim);
         self.links.reserve(additional);
     }
 
@@ -721,7 +733,23 @@ impl HnswIndex {
     /// Stores prepared vectors as new, unlinked nodes and returns the first id.
     fn append_nodes(&mut self, keys: &[u64], prepared: &[f32]) -> u32 {
         debug_assert_eq!(prepared.len(), keys.len() * self.dim);
+        self.vectors.extend_from_slice(prepared);
+        if let Some(q) = &mut self.quantized {
+            for v in prepared.chunks_exact(self.dim) {
+                q.quantizer.encode_into(v, &mut q.codes);
+            }
+        }
+        self.push_nodes(keys)
+    }
+
+    /// Adds unlinked nodes for `keys`, whose vectors must already be the
+    /// last `keys.len()` rows of `self.vectors`. Returns the first new id.
+    fn push_nodes(&mut self, keys: &[u64]) -> u32 {
         let first = self.node_count() as u32;
+        debug_assert_eq!(
+            self.vectors.len(),
+            (self.node_count() + keys.len()) * self.dim
+        );
         self.reserve_nodes(keys.len());
         for (i, &key) in keys.iter().enumerate() {
             let id = first + i as u32;
@@ -731,12 +759,6 @@ impl HnswIndex {
             self.levels.push(level);
             self.deleted.push(false);
             self.key_to_id.insert(key, id);
-        }
-        self.vectors.extend_from_slice(prepared);
-        if let Some(q) = &mut self.quantized {
-            for v in prepared.chunks_exact(self.dim) {
-                q.quantizer.encode_into(v, &mut q.codes);
-            }
         }
         first
     }
