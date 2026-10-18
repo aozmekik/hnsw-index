@@ -1,0 +1,41 @@
+dataset,index,distances,ef,recall_at_10,qps_1_thread_wall,qps_1_thread_cpu,qps_8_threads_wall
+gaussian,"heuristic, parallel",f32,16,0.2271,23334.7,23432.4,127004.3
+gaussian,"heuristic, parallel",f32,32,0.3390,13213.2,13261.2,76873.6
+gaussian,"heuristic, parallel",f32,64,0.4745,7396.5,7426.2,39638.0
+gaussian,"heuristic, parallel",f32,128,0.6261,3906.7,3922.5,16703.6
+gaussian,"heuristic, parallel",f32,256,0.7684,1870.8,1950.5,10648.1
+gaussian,"heuristic, sequential",f32,16,0.2208,19824.4,20534.3,41979.7
+gaussian,"heuristic, sequential",f32,32,0.3296,7016.1,9729.8,31624.1
+gaussian,"heuristic, sequential",f32,64,0.4726,6444.1,6542.2,27403.0
+gaussian,"heuristic, sequential",f32,128,0.6271,3318.7,3414.0,10733.8
+gaussian,"heuristic, sequential",f32,256,0.7671,1421.8,1651.0,6172.0
+gaussian,"heuristic, sequential",int8 + f32 re-rank,16,0.2202,43861.3,45564.3,117481.2
+gaussian,"heuristic, sequential",int8 + f32 re-rank,32,0.3266,23639.4,24036.2,105712.4
+gaussian,"heuristic, sequential",int8 + f32 re-rank,64,0.4740,14044.5,14305.3,50635.3
+gaussian,"heuristic, sequential",int8 + f32 re-rank,128,0.6284,7406.2,7589.1,35608.3
+gaussian,"heuristic, sequential",int8 + f32 re-rank,256,0.7646,3619.5,3642.2,20407.2
+gaussian,"simple, parallel",f32,16,0.2327,19044.3,20234.3,76654.8
+gaussian,"simple, parallel",f32,32,0.3435,13133.2,13589.9,51511.8
+gaussian,"simple, parallel",f32,64,0.4783,7912.3,7985.8,31959.7
+gaussian,"simple, parallel",f32,128,0.6177,3693.7,3890.4,20823.6
+gaussian,"simple, parallel",f32,256,0.7524,1663.1,1846.2,9114.2
+clustered,"heuristic, parallel",f32,16,0.7838,23563.9,24284.8,74524.0
+clustered,"heuristic, parallel",f32,32,0.9165,16084.9,16257.5,74983.8
+clustered,"heuristic, parallel",f32,64,0.9851,10454.6,10702.5,42852.2
+clustered,"heuristic, parallel",f32,128,0.9990,8042.0,8082.9,39235.9
+clustered,"heuristic, parallel",f32,256,0.9996,6099.6,6121.9,30039.7
+clustered,"heuristic, sequential",f32,16,0.7938,24648.6,25315.2,92154.2
+clustered,"heuristic, sequential",f32,32,0.9253,16773.4,16866.5,67937.9
+clustered,"heuristic, sequential",f32,64,0.9867,10534.2,10865.4,42872.5
+clustered,"heuristic, sequential",f32,128,0.9988,8187.6,8231.5,32470.1
+clustered,"heuristic, sequential",f32,256,1.0000,5245.0,5405.2,24812.6
+clustered,"heuristic, sequential",int8 + f32 re-rank,16,0.7939,44919.8,46070.2,91168.4
+clustered,"heuristic, sequential",int8 + f32 re-rank,32,0.9236,28875.8,28972.9,97470.2
+clustered,"heuristic, sequential",int8 + f32 re-rank,64,0.9865,15705.2,16297.0,72324.0
+clustered,"heuristic, sequential",int8 + f32 re-rank,128,0.9986,10832.6,10912.4,54455.1
+clustered,"heuristic, sequential",int8 + f32 re-rank,256,1.0000,6333.2,6520.4,26330.5
+clustered,"simple, parallel",f32,16,0.6748,22352.5,25370.4,90165.6
+clustered,"simple, parallel",f32,32,0.7796,11581.1,14659.3,38132.9
+clustered,"simple, parallel",f32,64,0.8447,4158.7,8607.2,41144.2
+clustered,"simple, parallel",f32,128,0.8831,5978.2,6988.0,25645.2
+clustered,"simple, parallel",f32,256,0.9095,4727.8,5185.5,18832.2

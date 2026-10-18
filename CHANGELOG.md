@@ -26,8 +26,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before
   (`from_bytes_with_limit`, `Error::MemoryLimitExceeded`).
 - `BruteForceIndex` for exact ground truth, `eval::recall_at_k`, seeded
   synthetic datasets.
-- `hnsw-bench` binary, Criterion benches, examples, property tests and a
-  recall regression suite.
+- `hnsw-bench` binary (CSV, Markdown and SVG output, load average recorded
+  per run), `scripts/bench_summary.py` to summarize several runs, Criterion
+  benches, examples, property tests and a recall regression suite.
 
 [Unreleased]: https://github.com/aozmekik/hnsw-index/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/aozmekik/hnsw-index/releases/tag/v0.1.0

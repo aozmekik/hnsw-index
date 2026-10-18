@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480" font-family="Helvetica, Arial, sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="78" y="22" font-size="15" font-weight="bold" fill="#111">gaussian 100k x 128-d (synthetic): recall@10 vs QPS, 1 thread (per CPU-second)</text>
+<text x="78" y="38" fill="#555">M=16, efConstruction=200, ef in [16, 32, 64, 128, 256]; macos aarch64, neon kernels</text>
+<line x1="78.0" y1="48" x2="78.0" y2="416.0" stroke="#e5e5e5"/><text x="78.0" y="434.0" text-anchor="middle" fill="#333">0.20</text>
+<line x1="106.2" y1="48" x2="106.2" y2="416.0" stroke="#e5e5e5"/><text x="106.2" y="434.0" text-anchor="middle" fill="#333">0.25</text>
+<line x1="134.5" y1="48" x2="134.5" y2="416.0" stroke="#e5e5e5"/><text x="134.5" y="434.0" text-anchor="middle" fill="#333">0.30</text>
+<line x1="162.7" y1="48" x2="162.7" y2="416.0" stroke="#e5e5e5"/><text x="162.7" y="434.0" text-anchor="middle" fill="#333">0.35</text>
+<line x1="191.0" y1="48" x2="191.0" y2="416.0" stroke="#e5e5e5"/><text x="191.0" y="434.0" text-anchor="middle" fill="#333">0.40</text>
+<line x1="219.2" y1="48" x2="219.2" y2="416.0" stroke="#e5e5e5"/><text x="219.2" y="434.0" text-anchor="middle" fill="#333">0.45</text>
+<line x1="247.5" y1="48" x2="247.5" y2="416.0" stroke="#e5e5e5"/><text x="247.5" y="434.0" text-anchor="middle" fill="#333">0.50</text>
+<line x1="275.7" y1="48" x2="275.7" y2="416.0" stroke="#e5e5e5"/><text x="275.7" y="434.0" text-anchor="middle" fill="#333">0.55</text>
+<line x1="304.0" y1="48" x2="304.0" y2="416.0" stroke="#e5e5e5"/><text x="304.0" y="434.0" text-anchor="middle" fill="#333">0.60</text>
+<line x1="332.2" y1="48" x2="332.2" y2="416.0" stroke="#e5e5e5"/><text x="332.2" y="434.0" text-anchor="middle" fill="#333">0.65</text>
+<line x1="360.5" y1="48" x2="360.5" y2="416.0" stroke="#e5e5e5"/><text x="360.5" y="434.0" text-anchor="middle" fill="#333">0.70</text>
+<line x1="388.8" y1="48" x2="388.8" y2="416.0" stroke="#e5e5e5"/><text x="388.8" y="434.0" text-anchor="middle" fill="#333">0.75</text>
+<line x1="417.0" y1="48" x2="417.0" y2="416.0" stroke="#e5e5e5"/><text x="417.0" y="434.0" text-anchor="middle" fill="#333">0.80</text>
+<line x1="445.3" y1="48" x2="445.3" y2="416.0" stroke="#e5e5e5"/><text x="445.3" y="434.0" text-anchor="middle" fill="#333">0.85</text>
+<line x1="473.5" y1="48" x2="473.5" y2="416.0" stroke="#e5e5e5"/><text x="473.5" y="434.0" text-anchor="middle" fill="#333">0.90</text>
+<line x1="501.8" y1="48" x2="501.8" y2="416.0" stroke="#e5e5e5"/><text x="501.8" y="434.0" text-anchor="middle" fill="#333">0.95</text>
+<line x1="530.0" y1="48" x2="530.0" y2="416.0" stroke="#e5e5e5"/><text x="530.0" y="434.0" text-anchor="middle" fill="#333">1.00</text>
+<line x1="78" y1="416.0" x2="530.0" y2="416.0" stroke="#e5e5e5"/><text x="70.0" y="420.0" text-anchor="end" fill="#333">1k</text>
+<line x1="78" y1="232.0" x2="530.0" y2="232.0" stroke="#e5e5e5"/><text x="70.0" y="236.0" text-anchor="end" fill="#333">10k</text>
+<line x1="78" y1="48.0" x2="530.0" y2="48.0" stroke="#e5e5e5"/><text x="70.0" y="52.0" text-anchor="end" fill="#333">100k</text>
+<rect x="78" y="48" width="452" height="368" fill="none" stroke="#999"/>
+<text x="304.0" y="462.0" text-anchor="middle" fill="#111">recall@10</text>
+<text transform="translate(18 232.0) rotate(-90)" text-anchor="middle" fill="#111">queries per second (log scale)</text>
+<polyline points="89.8,174.5 151.2,234.2 232.0,265.9 319.3,317.9 398.4,375.9" fill="none" stroke="#0072B2" stroke-width="2"/>
+<circle cx="89.8" cy="174.5" r="3.5" fill="#0072B2"/>
+<circle cx="151.2" cy="234.2" r="3.5" fill="#0072B2"/>
+<circle cx="232.0" cy="265.9" r="3.5" fill="#0072B2"/>
+<circle cx="319.3" cy="317.9" r="3.5" fill="#0072B2"/>
+<circle cx="398.4" cy="375.9" r="3.5" fill="#0072B2"/>
+<line x1="544.0" y1="58" x2="564.0" y2="58" stroke="#0072B2" stroke-width="2"/><text y="62.0" fill="#111"><tspan x="570.0" dy="0">heuristic, sequential build</tspan><tspan x="570.0" dy="15">f32 distances</tspan></text>
+<polyline points="89.4,110.8 149.5,161.9 232.8,203.4 320.0,254.0 397.0,312.7" fill="none" stroke="#D55E00" stroke-width="2"/>
+<circle cx="89.4" cy="110.8" r="3.5" fill="#D55E00"/>
+<circle cx="149.5" cy="161.9" r="3.5" fill="#D55E00"/>
+<circle cx="232.8" cy="203.4" r="3.5" fill="#D55E00"/>
+<circle cx="320.0" cy="254.0" r="3.5" fill="#D55E00"/>
+<circle cx="397.0" cy="312.7" r="3.5" fill="#D55E00"/>
+<line x1="544.0" y1="94" x2="564.0" y2="94" stroke="#D55E00" stroke-width="2"/><text y="98.0" fill="#111"><tspan x="570.0" dy="0">heuristic, sequential build</tspan><tspan x="570.0" dy="15">int8 traversal + re-rank</tspan></text>
+<polyline points="96.5,175.7 159.1,207.5 235.2,250.0 314.0,307.4 390.1,367.0" fill="none" stroke="#009E73" stroke-width="2"/>
+<circle cx="96.5" cy="175.7" r="3.5" fill="#009E73"/>
+<circle cx="159.1" cy="207.5" r="3.5" fill="#009E73"/>
+<circle cx="235.2" cy="250.0" r="3.5" fill="#009E73"/>
+<circle cx="314.0" cy="307.4" r="3.5" fill="#009E73"/>
+<circle cx="390.1" cy="367.0" r="3.5" fill="#009E73"/>
+<line x1="544.0" y1="130" x2="564.0" y2="130" stroke="#009E73" stroke-width="2"/><text y="134.0" fill="#111"><tspan x="570.0" dy="0">simple, parallel build</tspan><tspan x="570.0" dy="15">f32 distances</tspan></text>
+</svg>

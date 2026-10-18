@@ -36,11 +36,20 @@ cargo bench --bench kernels                     # Criterion: distance kernels pe
 cargo bench --bench search                      # Criterion: single-query latency
 ```
 
-The full benchmark in the README is
+The benchmarks in the README and [docs/benchmarks.md](docs/benchmarks.md) are
+three complete runs of the same command, summarized by a script that reports
+the median and range of every figure:
 
 ```sh
-cargo run --release --bin hnsw-bench -- --threads 8 --out docs/bench
+cargo build --release --locked
+for run in 1 2 3; do
+  ./target/release/hnsw-bench --threads 8 --out docs/bench/run-$run
+done
+python3 scripts/bench_summary.py docs/bench/run-1 docs/bench/run-2 docs/bench/run-3 > docs/bench/summary.md
 ```
+
+Timings depend on what else the machine is doing; each run records the load
+average at its start and end in its `results.md`.
 
 When you change construction or search code, run the recall tests with
 output to see the numbers they assert on:

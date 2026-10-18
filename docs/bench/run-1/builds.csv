@@ -1,0 +1,7 @@
+dataset,build,threads,wall_seconds,cpu_seconds,heap_bytes_per_vector,memory_usage_per_vector
+gaussian,"heuristic, parallel",8,6.510,38.533,714.7,714.7
+gaussian,"heuristic, sequential",1,37.714,36.188,700.6,700.6
+gaussian,"simple, parallel",8,7.041,32.113,714.7,714.7
+clustered,"heuristic, parallel",8,3.437,12.925,714.7,714.7
+clustered,"heuristic, sequential",1,11.630,11.357,700.7,700.7
+clustered,"simple, parallel",8,2.789,12.227,715.0,715.0

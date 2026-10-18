@@ -14,10 +14,12 @@
 //! [`Kernels::best`] picks the preferred available backend once per process:
 //! a hand-written SIMD backend when the CPU has one, otherwise the portable
 //! one. The hand-written kernels are not always faster: on an Apple M1 Pro
-//! they measure within a few percent of the portable kernels (see the README
-//! benchmarks). They are preferred because their instruction sequence (fused
-//! multiply-adds, which also round once instead of twice) does not depend on
-//! what the auto-vectorizer makes of a loop for a given compiler and target.
+//! they measure within 7% of the portable kernels, in either direction (see
+//! `docs/benchmarks.md`). They are preferred because their instruction
+//! sequence (fused multiply-adds, which also round once instead of twice)
+//! does not depend on what the auto-vectorizer makes of a loop for a given
+//! compiler and target.
+//!
 //! Different backends add the same products in a different order, so their
 //! results agree only up to floating-point rounding; the test suite checks each
 //! backend against [`Backend::Scalar`] with a tolerance proportional to the

@@ -35,8 +35,8 @@ always exact. The `f32` vectors are kept for that.
 ## Consequences
 
 - Quantization adds `dim` bytes per vector (about 25% for `f32` vectors)
-  rather than saving memory; its benefit is speed. Measured numbers are in the
-  README.
+  rather than saving memory; its benefit is speed. Measured numbers are in
+  `docs/benchmarks.md`.
 - One global scale is a poor fit when dimensions have very different ranges.
   The synthetic benchmarks have equal variance per dimension, which favors
   this scheme; real embeddings should be measured before relying on it.
