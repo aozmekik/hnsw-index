@@ -170,6 +170,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Config>, 
     if config.efs.is_empty() || config.efs.contains(&0) {
         return Err("--ef values must be positive".into());
     }
+    // Check M, efConstruction and the dimension the way the index will.
+    let params = HnswParams::new(config.m).with_ef_construction(config.ef_construction);
+    HnswIndex::new(config.dim, Metric::L2, params).map_err(|e| e.to_string())?;
     Ok(Some(config))
 }
 
@@ -505,13 +508,12 @@ fn charts(config: &Config, bench: &Bench<'_>) -> Vec<(String, String)> {
                     && (s.index == bench.primary_label || s.index.starts_with("simple"))
             });
             for s in charted {
-                let selection = s.index.split(',').next().unwrap_or_default();
                 let traversal = if s.distances == "f32" {
-                    "f32"
+                    "f32 distances"
                 } else {
-                    "int8 traversal"
+                    "int8 traversal + re-rank"
                 };
-                let label = format!("{selection}, {traversal}");
+                let label = format!("{} build\n{traversal}", s.index);
                 let qps = if threads == 1 {
                     s.qps_single_cpu.unwrap_or(s.qps_single)
                 } else {
@@ -644,6 +646,12 @@ mod tests {
         assert!(args(&["--ef", "8,x"]).is_err());
         assert!(args(&["--dataset", "sift"]).is_err());
         assert!(args(&["--frobnicate"]).is_err());
+        // Out-of-range index parameters are usage errors, not panics.
+        let err = args(&["--m", "1"]).unwrap_err();
+        assert!(err.contains("`m`"), "{err}");
+        assert!(args(&["--m", "600"]).is_err());
+        assert!(args(&["--ef-construction", "100000"]).is_err());
+        assert!(args(&["--dim", "100000"]).is_err());
     }
 
     #[test]

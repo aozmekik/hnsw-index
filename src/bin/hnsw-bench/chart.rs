@@ -5,6 +5,7 @@ use std::fmt::Write as _;
 
 /// One line on the chart.
 pub(crate) struct Series {
+    /// Legend text; `\n` starts a second line.
     pub(crate) label: String,
     /// `(recall, qps)` points, drawn in the given order.
     pub(crate) points: Vec<(f64, f64)>,
@@ -13,7 +14,7 @@ pub(crate) struct Series {
 const WIDTH: f64 = 760.0;
 const HEIGHT: f64 = 480.0;
 const LEFT: f64 = 78.0;
-const RIGHT: f64 = 210.0;
+const RIGHT: f64 = 230.0;
 const TOP: f64 = 48.0;
 const BOTTOM: f64 = 64.0;
 /// Colour-blind-safe palette (Okabe & Ito, 2008).
@@ -107,19 +108,36 @@ pub(crate) fn render(title: &str, subtitle: &str, x_label: &str, series: &[Serie
                 sy(y)
             );
         }
-        let ly = TOP + 10.0 + i as f64 * 20.0;
-        let lx = LEFT + plot_w + 16.0;
-        let _ = writeln!(
-            svg,
-            r##"<line x1="{lx}" y1="{ly}" x2="{:.1}" y2="{ly}" stroke="{colour}" stroke-width="2"/><text x="{:.1}" y="{:.1}" fill="#111">{}</text>"##,
-            lx + 22.0,
-            lx + 28.0,
-            ly + 4.0,
-            escape(&s.label)
+        legend_entry(
+            &mut svg,
+            LEFT + plot_w + 14.0,
+            TOP + 10.0 + i as f64 * 36.0,
+            colour,
+            &s.label,
         );
     }
     svg.push_str("</svg>\n");
     svg
+}
+
+/// A legend swatch at `(x, y)` followed by `label`, one text line per `\n`.
+fn legend_entry(svg: &mut String, x: f64, y: f64, colour: &str, label: &str) {
+    let tx = x + 26.0;
+    let mut lines = String::new();
+    for (j, line) in label.split('\n').enumerate() {
+        let dy = if j == 0 { 0.0 } else { 15.0 };
+        let _ = write!(
+            lines,
+            r#"<tspan x="{tx:.1}" dy="{dy}">{}</tspan>"#,
+            escape(line)
+        );
+    }
+    let _ = writeln!(
+        svg,
+        r##"<line x1="{x:.1}" y1="{y}" x2="{:.1}" y2="{y}" stroke="{colour}" stroke-width="2"/><text y="{:.1}" fill="#111">{lines}</text>"##,
+        x + 20.0,
+        y + 4.0,
+    );
 }
 
 fn format_qps(v: f64) -> String {
@@ -149,13 +167,14 @@ mod tests {
             "s",
             "recall@10",
             &[Series {
-                label: "a & b".into(),
+                label: "a & b\nsecond line".into(),
                 points: vec![(0.8, 5_000.0), (0.99, 800.0)],
             }],
         );
         assert!(svg.starts_with("<svg") && svg.ends_with("</svg>\n"));
         assert!(svg.contains("t &lt;1&gt;") && svg.contains("a &amp; b"));
         assert_eq!(svg.matches("<circle").count(), 2);
+        assert_eq!(svg.matches("<tspan").count(), 2);
         assert_eq!(format_qps(10_000.0), "10k");
     }
 }
