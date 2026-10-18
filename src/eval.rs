@@ -4,9 +4,9 @@ use crate::Neighbor;
 
 /// Mean recall@k of `found` against exact `truth`, in `[0, 1]`.
 ///
-/// For each query, counts how many of the first `k` true neighbours appear
+/// For each query, counts how many of the first `k` true neighbors appear
 /// among the first `k` found results, and divides by the number of true
-/// neighbours considered (`k`, or fewer when the index holds fewer than `k`
+/// neighbors considered (`k`, or fewer when the index holds fewer than `k`
 /// vectors). Returns 1.0 when there is nothing to find.
 ///
 /// # Panics

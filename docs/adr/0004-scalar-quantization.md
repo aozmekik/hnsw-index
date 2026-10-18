@@ -26,7 +26,7 @@ mean fewer cache misses and less arithmetic.
 Option 3. `code = round((x − offset) / scale)` clamped to `−127..=127`, with
 `scale = max |x − offset| / 127` over the stored vectors. For L2 the offset is
 the per-dimension mean (translation does not change Euclidean distances); for
-inner product and cosine it is zero, because centring changes how
+inner product and cosine it is zero, because centering changes how
 `⟨q − μ, x − μ⟩` ranks candidates. The codes are only used to navigate the
 graph. The graph itself is built with `f32` distances, and the `ef` final
 candidates are re-ranked with exact `f32` distances, so reported distances are
@@ -38,7 +38,7 @@ always exact. The `f32` vectors are kept for that.
   rather than saving memory; its benefit is speed. Measured numbers are in the
   README.
 - One global scale is a poor fit when dimensions have very different ranges.
-  The synthetic benchmarks have equal variance per dimension, which favours
+  The synthetic benchmarks have equal variance per dimension, which favors
   this scheme; real embeddings should be measured before relying on it.
 - Vectors inserted after `enable_quantization()` are encoded with the existing
   scale and clamped if out of range; calling it again retrains.

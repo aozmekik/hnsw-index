@@ -1,6 +1,6 @@
 //! Reference kernels: one accumulator, strict left-to-right summation.
 //!
-//! Floating-point addition is not associative, so LLVM may not vectorise these
+//! Floating-point addition is not associative, so LLVM may not vectorize these
 //! loops. That makes them slow but predictable, which is what a reference for
 //! equivalence tests needs.
 

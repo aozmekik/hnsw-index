@@ -117,7 +117,7 @@ pub struct GraphStats {
     pub live: usize,
     /// `nodes_per_layer[l]` is the number of nodes present on layer `l`.
     pub nodes_per_layer: Vec<usize>,
-    /// Mean number of neighbours per node on layer 0.
+    /// Mean number of neighbors per node on layer 0.
     pub mean_degree_layer0: f64,
 }
 
@@ -159,7 +159,7 @@ pub struct HnswIndex {
     /// Tombstones, indexed by node id.
     deleted: Vec<bool>,
     links: Links,
-    /// One lock per node, serialising writers of its neighbour lists.
+    /// One lock per node, serializing writers of its neighbor lists.
     locks: Vec<Mutex<()>>,
     /// Packed `(level << 32) | id` of the entry point, or [`NO_ENTRY`].
     entry: AtomicU64,
@@ -186,7 +186,7 @@ impl HnswIndex {
         Ok(Self::empty(dim, metric, params))
     }
 
-    /// Unvalidated constructor shared with deserialisation.
+    /// Unvalidated constructor shared with deserialization.
     fn empty(dim: usize, metric: Metric, params: HnswParams) -> Self {
         Self {
             dim,
@@ -257,7 +257,7 @@ impl HnswIndex {
     }
 
     /// The stored vector for `key`, if live. For [`Metric::Cosine`] this is
-    /// the normalised vector.
+    /// the normalized vector.
     #[must_use]
     pub fn get(&self, key: u64) -> Option<&[f32]> {
         self.key_to_id.get(&key).map(|&id| self.vector(id))
@@ -399,7 +399,7 @@ impl HnswIndex {
         *self = fresh;
     }
 
-    /// The `k` approximate nearest neighbours of `query`, closest first.
+    /// The `k` approximate nearest neighbors of `query`, closest first.
     ///
     /// `ef` is the size of the candidate list on layer 0 (raised to `k` if
     /// smaller): larger values raise recall and cost time. Returns fewer than
@@ -601,7 +601,7 @@ impl HnswIndex {
             })
     }
 
-    /// Serialises the index (format described in `docs/adr/0003`).
+    /// Serializes the index (format described in `docs/adr/0003`).
     ///
     /// Output is buffered internally, so `writer` need not be a `BufWriter`.
     ///
@@ -630,7 +630,7 @@ impl HnswIndex {
         Self::from_bytes(&bytes)
     }
 
-    /// Serialises the index into a byte vector.
+    /// Serializes the index into a byte vector.
     ///
     /// # Panics
     ///
@@ -642,7 +642,7 @@ impl HnswIndex {
         out
     }
 
-    /// Parses and validates a serialised index.
+    /// Parses and validates a serialized index.
     ///
     /// Checks the magic bytes, version and CRC-32, then every structural
     /// invariant (ids in range, capacities, vectors that

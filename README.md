@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A from-scratch Rust implementation of HNSW graphs for approximate nearest
-neighbour search, with SIMD distance kernels, filtered search, deletions and
+neighbor search, with SIMD distance kernels, filtered search, deletions and
 a validated on-disk format.
 
 > **Status:** early, version 0.1.0. The API may change. Not yet published to
@@ -25,12 +25,12 @@ identical data ([below](#correctness)).
 
 - **The paper's algorithms**: insertion with level sampling (`mL = 1/ln M`),
   greedy descent through the upper layers, ef-bounded search on layer 0, and
-  both neighbour selection strategies, simple (Algorithm 3) and heuristic
+  both neighbor selection strategies, simple (Algorithm 3) and heuristic
   (Algorithm 4, with optional `extendCandidates` and `keepPrunedConnections`).
   Parameters `M`, `M0` and `efConstruction`.
 - **Metrics**: squared L2, inner product and cosine over fixed-dimension `f32`
   vectors.
-- **SIMD kernels**: a 16-accumulator loop that LLVM auto-vectorises, plus
+- **SIMD kernels**: a 16-accumulator loop that LLVM auto-vectorizes, plus
   hand-written NEON (aarch64) and AVX2+FMA (x86_64) kernels chosen by runtime
   feature detection, each tested against a scalar reference.
 - **Filtered search**: `search_filtered(query, k, ef, |key| ...)` applies the
@@ -79,7 +79,7 @@ fn main() -> Result<(), hnsw_index::Error> {
     index.insert(2, &[0.0, 1.0, 0.0])?;
     index.insert_batch(&[3, 4], &[0.9, 0.1, 0.0, 0.0, 0.0, 1.0])?; // flat, row-major
 
-    // The 2 nearest neighbours, with a candidate list of size ef = 32.
+    // The 2 nearest neighbors, with a candidate list of size ef = 32.
     let hits = index.search(&[1.0, 0.05, 0.0], 2, 32)?;
     assert_eq!(hits[0].key, 1);
 
@@ -123,10 +123,10 @@ smaller is always closer.
 ## Design notes
 
 - **Graph storage and concurrency** ([ADR 0001](docs/adr/0001-graph-storage-and-concurrency.md)).
-  Neighbour lists are fixed-capacity blocks of `AtomicU32` (count, then ids):
+  Neighbor lists are fixed-capacity blocks of `AtomicU32` (count, then ids):
   one contiguous array for layer 0, a boxed slice per node for upper layers.
   Writers take a per-node lock and publish the count last; readers never lock.
-  Neighbour ids are `Relaxed` loads (plain loads); the count is an `Acquire`
+  Neighbor ids are `Relaxed` loads (plain loads); the count is an `Acquire`
   load, free on x86-64 and an `LDAPR` on AArch64, once per list. The graph
   code has no `unsafe`. Every critical section
   holds a single node lock, which makes parallel builds deadlock-free. An
@@ -142,13 +142,13 @@ smaller is always closer.
   rebuilds from live vectors. In-place graph repair was not attempted.
 - **File format** ([ADR 0003](docs/adr/0003-file-format.md)). Fixed header,
   columnar sections, CRC-32 trailer. The loader checks magic, version and
-  checksum, then every invariant. Because neighbour lists have a fixed
+  checksum, then every invariant. Because neighbor lists have a fixed
   capacity, a small file can describe a large index, so before allocating
   graph storage the loader checks that every list is present and that the
   described index fits a memory limit (64 times the input size or 64 MiB by
   default; `from_bytes_with_limit` sets another).
 - **Quantization** ([ADR 0004](docs/adr/0004-scalar-quantization.md)).
-  Symmetric int8 codes with one global scale (per-dimension centring for L2),
+  Symmetric int8 codes with one global scale (per-dimension centering for L2),
   exact integer distances, used only to navigate; the final `ef` candidates
   are re-ranked with `f32` distances. It costs memory (codes are added) and
   buys speed.
@@ -163,7 +163,7 @@ smaller is always closer.
   deterministic sequential builds), property tests with proptest (results
   sorted, at most `k`, unique, never tombstoned, filter respected, reported
   distances bit-identical to a recomputation, compaction keeps exactly the
-  live keys, serialisation round trip, random truncation and byte mutation of
+  live keys, serialization round trip, random truncation and byte mutation of
   files never panic), SIMD-versus-scalar equivalence for every available
   backend, concurrency tests, and a check of `memory_usage()` against a
   counting allocator.
@@ -189,7 +189,7 @@ smaller is always closer.
   (hnswlib 0.8.0, numpy 2.5.4, Python 3.13, in a throwaway venv) and
   `hnsw-bench --dataset gaussian --n 10000 --queries 200 --dim 128 --m {16,32} --ef 16,32,64,100,128,256 --skip-simple --repeats 1`.
   The two libraries draw node levels from different random streams, so their
-  graphs differ. Treating the 2,000 query–neighbour pairs as independent, one
+  graphs differ. Treating the 2,000 query–neighbor pairs as independent, one
   standard error is about 0.011 at recall 0.6 and below 0.005 above 0.95.
 
   The same check on the 100k benchmark datasets (1,000 queries, `M = 16`,
@@ -237,7 +237,7 @@ cargo build --release --locked
 - Datasets: 100,000 base vectors and 1,000 queries, 128 dimensions, seed 42.
   `gaussian` has i.i.d. standard normal components (no structure, a hard
   case); `clustered` is a mixture of 100 Gaussian clusters (standard normal
-  centres, spread 0.35). Queries are drawn after the base set from the same
+  centers, spread 0.35). Queries are drawn after the base set from the same
   distribution, so they are disjoint from it.
 - Index: L2, `M = 16`, `M0 = 32`, `efConstruction = 200`, k = 10. Ground truth
   from `BruteForceIndex`.
@@ -269,7 +269,7 @@ allocator.
 
 `HnswIndex` built sequentially with the heuristic; "int8" is quantized
 traversal with exact re-ranking on the same index; "simple" is a separate,
-parallel build with simple neighbour selection.
+parallel build with simple neighbor selection.
 
 **gaussian, 100k × 128**
 
@@ -324,17 +324,17 @@ What the numbers show, within the noise above:
 `cargo bench --bench kernels` (Criterion's point estimate of the time per
 call; same machine and load conditions):
 
-| kernel | dim | scalar | portable (auto-vectorised) | NEON |
+| kernel | dim | scalar | portable (auto-vectorized) | NEON |
 |---|---:|---:|---:|---:|
 | dot | 128 | 58.1 ns | 10.2 ns | 10.5 ns |
 | dot | 768 | 659 ns | 47.8 ns | 47.7 ns |
 | l2_squared | 128 | 65.1 ns | 12.4 ns | 12.0 ns |
 | l2_squared | 768 | 639 ns | 50.4 ns | 60.6 ns |
 
-On this CPU, LLVM's auto-vectorisation of the 16-accumulator loop is as fast
+On this CPU, LLVM's auto-vectorization of the 16-accumulator loop is as fast
 as the hand-written NEON kernels, or faster (768-d L2; that NEON figure also
 had the widest 95% confidence interval, 56.6 to 66.4 ns). The scalar reference is 5x to 14x
-slower because strict IEEE summation order prevents vectorisation. The AVX2
+slower because strict IEEE summation order prevents vectorization. The AVX2
 kernels were not benchmarked: there is no x86 machine in this setup, and they
 are only built and tested by CI.
 
@@ -362,7 +362,7 @@ Deliberately left out of 0.1.0:
 - in-place repair of deleted nodes (reusing slots instead of rebuilding);
 - benchmarks on standard datasets (SIFT1M, GloVe) via ann-benchmarks' HDF5
   files;
-- software prefetching of neighbour vectors during search;
+- software prefetching of neighbor vectors during search;
 - `cargo-fuzz` targets for the loader (needs nightly; property-based mutation
   testing covers it for now);
 - quantization that replaces the `f32` vectors (memory savings) and

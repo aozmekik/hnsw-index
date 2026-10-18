@@ -1,4 +1,4 @@
-//! Portable kernels that auto-vectorise.
+//! Portable kernels that auto-vectorize.
 //!
 //! The loops keep [`LANES`] independent partial sums. Because each lane is a
 //! separate dependency chain, LLVM is free to map them onto whatever vector
@@ -44,7 +44,7 @@ pub(super) fn l2_squared(a: &[f32], b: &[f32]) -> f32 {
     sum
 }
 
-/// Pairwise (tree) reduction of the lanes, which is both vectorisable and more
+/// Pairwise (tree) reduction of the lanes, which is both vectorizable and more
 /// accurate than a linear sum.
 #[inline]
 fn reduce(mut acc: [f32; LANES]) -> f32 {

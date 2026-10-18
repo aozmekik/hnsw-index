@@ -9,7 +9,7 @@
 //! weights are needed in the inner loop.
 //!
 //! For L2, `offset` is the per-dimension mean: translation does not change
-//! Euclidean distances and centring halves the range to cover. For inner
+//! Euclidean distances and centering halves the range to cover. For inner
 //! product and cosine the offset is zero, because `⟨q − μ, x − μ⟩` does not
 //! rank `x` the same way as `⟨q, x⟩`.
 //!
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn codes_are_clamped_and_offsets_centre_l2() {
+    fn codes_are_clamped_and_offsets_center_l2() {
         let vectors = [0.0, 10.0, 2.0, 30.0];
         let sq = ScalarQuantizer::train(Metric::L2, 2, &vectors);
         assert_eq!(sq.offset(), &[1.0, 20.0]);

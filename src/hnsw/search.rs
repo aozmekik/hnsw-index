@@ -44,8 +44,8 @@ impl Ord for Candidate {
 }
 
 impl HnswIndex {
-    /// Greedy walk on one layer: move to the closest neighbour until no
-    /// neighbour is closer. This is SEARCH-LAYER with `ef = 1`, without heaps.
+    /// Greedy walk on one layer: move to the closest neighbor until no
+    /// neighbor is closer. This is SEARCH-LAYER with `ef = 1`, without heaps.
     pub(super) fn greedy_closest(
         &self,
         start: Candidate,

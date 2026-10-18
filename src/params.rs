@@ -11,7 +11,7 @@ pub(crate) const MAX_EF_CONSTRUCTION: usize = 1 << 16;
 /// Largest accepted level multiplier `mL`.
 pub(crate) const MAX_LEVEL_MULTIPLIER: f64 = 10.0;
 
-/// How a node chooses its neighbours from a candidate list.
+/// How a node chooses its neighbors from a candidate list.
 ///
 /// Both strategies come from Malkov & Yashunin (TPAMI 2020): `Simple` is
 /// SELECT-NEIGHBORS-SIMPLE (Algorithm 3), `Heuristic` is
@@ -22,10 +22,10 @@ pub enum NeighborSelection {
     /// Keep the `M` nearest candidates.
     Simple,
     /// Keep a candidate only if it is closer to the base node than to every
-    /// neighbour kept so far. This favours neighbours in different directions,
+    /// neighbor kept so far. This favors neighbors in different directions,
     /// which keeps clustered data connected.
     Heuristic {
-        /// Also consider the neighbours of each candidate (the paper's
+        /// Also consider the neighbors of each candidate (the paper's
         /// `extendCandidates`). Costs extra distance computations; the paper
         /// recommends it only for extremely clustered data.
         extend_candidates: bool,
@@ -87,7 +87,7 @@ impl HnswParams {
         }
     }
 
-    /// Sets `M0`, the maximum number of neighbours per node on layer 0.
+    /// Sets `M0`, the maximum number of neighbors per node on layer 0.
     #[must_use]
     pub fn with_m0(mut self, m0: usize) -> Self {
         self.m0 = m0;
@@ -109,7 +109,7 @@ impl HnswParams {
         self
     }
 
-    /// Sets the neighbour selection strategy.
+    /// Sets the neighbor selection strategy.
     #[must_use]
     pub fn with_selection(mut self, selection: NeighborSelection) -> Self {
         self.selection = selection;
@@ -123,14 +123,14 @@ impl HnswParams {
         self
     }
 
-    /// `M`: neighbours a new node links to on every layer, and the maximum
-    /// number of neighbours per node on layers above 0.
+    /// `M`: neighbors a new node links to on every layer, and the maximum
+    /// number of neighbors per node on layers above 0.
     #[must_use]
     pub fn m(&self) -> usize {
         self.m
     }
 
-    /// `M0` (the paper's `Mmax0`): maximum neighbours per node on layer 0.
+    /// `M0` (the paper's `Mmax0`): maximum neighbors per node on layer 0.
     #[must_use]
     pub fn m0(&self) -> usize {
         self.m0
@@ -148,7 +148,7 @@ impl HnswParams {
         self.level_multiplier
     }
 
-    /// The neighbour selection strategy.
+    /// The neighbor selection strategy.
     #[must_use]
     pub fn selection(&self) -> NeighborSelection {
         self.selection

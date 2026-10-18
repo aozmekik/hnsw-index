@@ -86,7 +86,7 @@ pub(crate) fn prepare_batch(
     Ok(out)
 }
 
-/// Validates a query; borrows it unless cosine requires a normalised copy.
+/// Validates a query; borrows it unless cosine requires a normalized copy.
 pub(crate) fn prepare_query(
     metric: Metric,
     dim: usize,
@@ -108,7 +108,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cosine_vectors_are_normalised() {
+    fn cosine_vectors_are_normalized() {
         let mut out = Vec::new();
         prepare_into(Metric::Cosine, 2, &[3.0, 4.0], &mut out).unwrap();
         assert!((out[0] - 0.6).abs() < 1e-7 && (out[1] - 0.8).abs() < 1e-7);

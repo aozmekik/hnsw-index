@@ -13,9 +13,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before
 
 - `HnswIndex`: HNSW after Malkov & Yashunin (TPAMI 2020) with level sampling
   (`mL = 1/ln M`), greedy upper-layer descent, ef-bounded layer-0 search, and
-  simple or heuristic neighbour selection (`extendCandidates`,
+  simple or heuristic neighbor selection (`extendCandidates`,
   `keepPrunedConnections`); parameters `M`, `M0`, `efConstruction`.
-- Squared L2, inner product and cosine metrics; scalar, auto-vectorised, NEON
+- Squared L2, inner product and cosine metrics; scalar, auto-vectorized, NEON
   and AVX2+FMA kernels with runtime detection.
 - Filtered search, tombstone deletion, `compact()`, parallel
   `insert_batch` (rayon), `reserve`, concurrent `&self` search,

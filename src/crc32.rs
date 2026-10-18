@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn standard_check_value() {
-        // The "check" value from the CRC catalogue for CRC-32/ISO-HDLC.
+        // The "check" value from the CRC catalog for CRC-32/ISO-HDLC.
         assert_eq!(checksum(b"123456789"), 0xCBF4_3926);
         assert_eq!(checksum(b""), 0);
         assert_eq!(

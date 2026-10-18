@@ -31,7 +31,7 @@
 //! checked first; then every field is validated before it is used: enum tags,
 //! parameter ranges, every vector passing the same checks as
 //! [`HnswIndex::insert`] (finite, squared norm in range, unit length for
-//! cosine), unique live keys, neighbour counts within capacity, and neighbour
+//! cosine), unique live keys, neighbor counts within capacity, and neighbor
 //! ids in range, unique within their list, not self-referencing, and present
 //! on the layer they are linked on, and an entry point on the top level. Any
 //! violation is a [`FormatError`], never a panic.
@@ -43,7 +43,7 @@
 //!    anything is parsed out of it, so a node count larger than the input
 //!    fails as [`FormatError::Truncated`] without allocating.
 //! 2. The adjacency section is walked once without allocating: every
-//!    neighbour list must be present, with a count within its capacity. A
+//!    neighbor list must be present, with a count within its capacity. A
 //!    file therefore pays at least four bytes for every list it makes the
 //!    loader allocate.
 //! 3. Adjacency storage is fixed-capacity per layer (see `graph.rs`), so even
@@ -322,7 +322,7 @@ fn read_header(r: &mut Reader<'_>) -> Result<Header, Error> {
             extend_candidates: flags & 1 != 0,
             keep_pruned: flags & 2 != 0,
         },
-        _ => return Err(invalid("neighbour selection")),
+        _ => return Err(invalid("neighbor selection")),
     };
     let quantized = match r.u8()? {
         0 => false,
@@ -366,7 +366,7 @@ struct Columns<'a> {
     levels: &'a [u8],
     flags: &'a [u8],
     vectors: &'a [u8],
-    /// Sum of all node levels: the number of upper-layer neighbour lists.
+    /// Sum of all node levels: the number of upper-layer neighbor lists.
     level_sum: usize,
 }
 
@@ -401,7 +401,7 @@ fn read_columns<'a>(r: &mut Reader<'a>, h: &Header) -> Result<Columns<'a>, Error
     })
 }
 
-/// Walks the adjacency section without allocating: every neighbour list of
+/// Walks the adjacency section without allocating: every neighbor list of
 /// every node must be present, with a count within the layer's capacity.
 /// Contents are validated later by [`read_links`].
 fn scan_links(mut r: Reader<'_>, levels: &[u8], params: &HnswParams) -> Result<(), Error> {
@@ -410,7 +410,7 @@ fn scan_links(mut r: Reader<'_>, levels: &[u8], params: &HnswParams) -> Result<(
             let count = r.u32()? as usize;
             let capacity = if layer == 0 { params.m0() } else { params.m() };
             if count > capacity {
-                return Err(invalid("neighbour count exceeds capacity"));
+                return Err(invalid("neighbor count exceeds capacity"));
             }
             r.take(count * size_of::<u32>())?;
         }
@@ -491,21 +491,21 @@ fn read_links(r: &mut Reader<'_>, index: &mut HnswIndex) -> Result<(), Error> {
         for layer in 0..=usize::from(index.levels[id]) {
             let count = r.u32()? as usize;
             if count > index.links.capacity(layer) {
-                return Err(invalid("neighbour count exceeds capacity"));
+                return Err(invalid("neighbor count exceeds capacity"));
             }
             neighbors.clear();
             for _ in 0..count {
                 let nb = r.u32()? as usize;
                 let valid = nb < n && nb != id && usize::from(index.levels[nb]) >= layer;
                 if !valid {
-                    return Err(invalid("neighbour id"));
+                    return Err(invalid("neighbor id"));
                 }
                 neighbors.push(nb as u32);
             }
             sorted.clone_from(&neighbors);
             sorted.sort_unstable();
             if sorted.windows(2).any(|w| w[0] == w[1]) {
-                return Err(invalid("duplicate neighbour id"));
+                return Err(invalid("duplicate neighbor id"));
             }
             index.links.set(id as u32, layer, &neighbors);
         }

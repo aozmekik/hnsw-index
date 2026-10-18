@@ -1,4 +1,4 @@
-//! Insertion: INSERT (Algorithm 1) and neighbour selection (Algorithms 3–4).
+//! Insertion: INSERT (Algorithm 1) and neighbor selection (Algorithms 3–4).
 
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -13,7 +13,7 @@ use crate::synthetic::mix64;
 ///
 /// `U` is derived by hashing `(seed, id)` rather than drawn from a stateful
 /// generator, so a node's level does not depend on insertion order or on how
-/// work is split across threads, and nothing needs to be serialised to keep
+/// work is split across threads, and nothing needs to be serialized to keep
 /// sampling reproducible.
 #[allow(clippy::cast_sign_loss)] // `level` is in `0.0..31.0` when cast
 pub(super) fn sample_level(seed: u64, id: u32, level_multiplier: f64) -> u8 {
@@ -30,7 +30,7 @@ pub(super) fn sample_level(seed: u64, id: u32, level_multiplier: f64) -> u8 {
 impl HnswIndex {
     /// Links an already-stored node into the graph (INSERT, Algorithm 1).
     ///
-    /// Takes `&self` so that many nodes can be linked in parallel: neighbour
+    /// Takes `&self` so that many nodes can be linked in parallel: neighbor
     /// lists are atomics guarded by per-node locks (see `graph.rs`), and the
     /// entry point is an atomic word updated under `promotion`.
     ///
@@ -93,7 +93,7 @@ impl HnswIndex {
         }
     }
 
-    /// Writes the new node's own neighbour list on `layer`.
+    /// Writes the new node's own neighbor list on `layer`.
     ///
     /// The list is normally still empty, but a concurrent insertion may
     /// already have linked back to this node: nodes carried over as entry
@@ -147,7 +147,7 @@ impl HnswIndex {
         self.links.set(node, layer, &selected);
     }
 
-    /// Chooses at most `m` neighbours for `base_id` (whose vector is `base`)
+    /// Chooses at most `m` neighbors for `base_id` (whose vector is `base`)
     /// from `candidates`, which must be sorted by distance to `base`.
     fn select_neighbors(
         &self,
@@ -180,7 +180,7 @@ impl HnswIndex {
                     }
                     let v = self.vector(c.id);
                     // Keep `c` only if it is closer to the base than to every
-                    // neighbour already kept.
+                    // neighbor already kept.
                     let diverse = selected.iter().all(|s| {
                         self.metric.distance(&self.kernels, v, self.vector(s.id)) >= c.distance
                     });
@@ -197,7 +197,7 @@ impl HnswIndex {
         }
     }
 
-    /// The paper's `extendCandidates`: `candidates` plus their neighbours on
+    /// The paper's `extendCandidates`: `candidates` plus their neighbors on
     /// `layer`, deduplicated, without `base_id`, sorted by distance to `base`.
     fn extend_candidates(
         &self,

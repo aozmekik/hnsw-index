@@ -39,7 +39,7 @@ fn assert_invariants(index: &HnswIndex) {
                 assert!(usize::from(index.levels[nb as usize]) >= layer);
             }
             let unique: HashSet<u32> = neighbors.iter().copied().collect();
-            assert_eq!(unique.len(), neighbors.len(), "duplicate neighbour");
+            assert_eq!(unique.len(), neighbors.len(), "duplicate neighbor");
         }
     }
     if n > 0 {
@@ -500,7 +500,7 @@ fn loader_rejects_structural_violations() {
     assert_eq!(invalid(12, &[9]), FormatError::Invalid("metric"));
     assert_eq!(
         invalid(13, &[0, 1]),
-        FormatError::Invalid("neighbour selection")
+        FormatError::Invalid("neighbor selection")
     );
     assert_eq!(invalid(15, &[2]), FormatError::Invalid("quantized flag"));
     assert_eq!(
@@ -551,18 +551,18 @@ fn loader_rejects_structural_violations() {
     let links = vectors + 30 * 4 * 4;
     assert_eq!(
         invalid(links, &1000_u32.to_le_bytes()),
-        FormatError::Invalid("neighbour count exceeds capacity")
+        FormatError::Invalid("neighbor count exceeds capacity")
     );
     assert_eq!(
         invalid(links + 4, &999_u32.to_le_bytes()),
-        FormatError::Invalid("neighbour id")
+        FormatError::Invalid("neighbor id")
     );
     let count = u32::from_le_bytes(bytes[links..links + 4].try_into().unwrap());
-    assert!(count >= 2, "node 0 needs two neighbours for this case");
-    let first_neighbour = bytes[links + 4..links + 8].to_vec();
+    assert!(count >= 2, "node 0 needs two neighbors for this case");
+    let first_neighbor = bytes[links + 4..links + 8].to_vec();
     assert_eq!(
-        invalid(links + 8, &first_neighbour),
-        FormatError::Invalid("duplicate neighbour id")
+        invalid(links + 8, &first_neighbor),
+        FormatError::Invalid("duplicate neighbor id")
     );
     let mut longer = bytes[..bytes.len() - 4].to_vec();
     longer.extend_from_slice(&[0, 0, 0, 0, 0]);
@@ -638,7 +638,7 @@ fn memory_limit_is_the_loaded_memory_usage() {
 #[test]
 fn default_memory_limit_admits_low_dimensional_indexes_with_m0_256() {
     // One-dimensional vectors are the worst case for the ratio of memory to
-    // file size: the heuristic keeps about four neighbours per node, so the
+    // file size: the heuristic keeps about four neighbors per node, so the
     // file is small while every node still owns M0 + 1 slots.
     let data = Dataset::gaussian(20_000, 1, 1, 5);
     let index = build(&data, Metric::L2, HnswParams::new(128), true);

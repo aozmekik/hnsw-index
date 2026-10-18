@@ -1,5 +1,5 @@
 //! A from-scratch implementation of Hierarchical Navigable Small World (HNSW)
-//! graphs for approximate nearest neighbour search, following
+//! graphs for approximate nearest neighbor search, following
 //!
 //! > Yu. A. Malkov and D. A. Yashunin, "Efficient and robust approximate
 //! > nearest neighbor search using Hierarchical Navigable Small World graphs",
@@ -10,7 +10,7 @@
 //!
 //! * [`HnswIndex`]: the approximate index. Insertion with level sampling
 //!   (`mL = 1/ln M`), greedy descent through the upper layers and an
-//!   ef-bounded search on layer 0, with either neighbour-selection strategy
+//!   ef-bounded search on layer 0, with either neighbor-selection strategy
 //!   of the paper ([`NeighborSelection`]).
 //! * [`BruteForceIndex`]: exact search, for ground truth.
 //! * [`Metric`]: squared L2, inner product and cosine, computed by SIMD

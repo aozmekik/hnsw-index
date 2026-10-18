@@ -3,7 +3,7 @@ name = "hnsw-index"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "From-scratch HNSW approximate nearest neighbour index with SIMD distance kernels, filtered search, tombstones and a checksummed file format"
+description = "From-scratch HNSW approximate nearest neighbor index with SIMD distance kernels, filtered search, tombstones and a checksummed file format"
 authors = ["Ahmed Semih Özmekik"]
 license = "MIT"
 repository = "https://github.com/aozmekik/hnsw-index"
@@ -36,7 +36,7 @@ codegen-units = 1
 lto = "thin"
 
 # Integration tests build 10k-vector indexes; keep debug assertions and
-# overflow checks but optimise so `cargo test` stays fast.
+# overflow checks but optimize so `cargo test` stays fast.
 [profile.test]
 opt-level = 3
 

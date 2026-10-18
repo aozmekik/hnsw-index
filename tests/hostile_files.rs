@@ -91,7 +91,7 @@ fn crc32(bytes: &[u8]) -> u32 {
 }
 
 /// A file with `n` one-dimensional nodes, all on `level`, under the largest
-/// accepted `M`, `M0` and `mL`. Every neighbour list is empty. With
+/// accepted `M`, `M0` and `mL`. Every neighbor list is empty. With
 /// `layers_present` below `level + 1`, only that many count words are
 /// written per node, so the adjacency section is truncated.
 fn crafted(n: u32, level: u8, layers_present: usize) -> Vec<u8> {

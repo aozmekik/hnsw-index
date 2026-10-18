@@ -19,7 +19,7 @@ cargo clippy --all-targets -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 ```
 
-The `test` profile is optimised (`opt-level = 3`, debug assertions kept),
+The `test` profile is optimized (`opt-level = 3`, debug assertions kept),
 because the recall tests build 10k-vector indexes.
 
 Lints are configured in `Cargo.toml` (`[lints]`): Clippy's `pedantic` group is

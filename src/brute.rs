@@ -12,7 +12,7 @@ use crate::{Error, MAX_DIM, Metric, Neighbor};
 ///
 /// Search costs `O(n·d)` per query, but results are exact, which makes this
 /// the ground truth for measuring the recall of [`HnswIndex`](crate::HnswIndex).
-/// It uses the same validation, normalisation and distance kernels.
+/// It uses the same validation, normalization and distance kernels.
 ///
 /// ```
 /// use hnsw_index::{BruteForceIndex, Metric};
@@ -113,7 +113,7 @@ impl BruteForceIndex {
         Ok(())
     }
 
-    /// The exact `k` nearest neighbours, closest first. Returns every vector
+    /// The exact `k` nearest neighbors, closest first. Returns every vector
     /// if `k` exceeds [`len`](Self::len).
     ///
     /// # Errors
@@ -123,7 +123,7 @@ impl BruteForceIndex {
         self.search_filtered(query, k, |_| true)
     }
 
-    /// The exact `k` nearest neighbours among keys accepted by `filter`.
+    /// The exact `k` nearest neighbors among keys accepted by `filter`.
     ///
     /// # Errors
     ///
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn returns_sorted_exact_neighbours() {
+    fn returns_sorted_exact_neighbors() {
         let hits = index().search(&[4.0], 3).unwrap();
         let keys: Vec<u64> = hits.iter().map(|n| n.key).collect();
         // Keys 3 and 5 tie at distance 1; ties break by key.

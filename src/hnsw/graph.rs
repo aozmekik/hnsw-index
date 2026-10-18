@@ -1,21 +1,21 @@
 //! Adjacency storage.
 //!
 //! Each node owns one fixed-capacity block of `u32` words per layer it lives
-//! on: word 0 is the neighbour count, the rest are neighbour ids. Layer-0
+//! on: word 0 is the neighbor count, the rest are neighbor ids. Layer-0
 //! blocks for all nodes live in one contiguous allocation (most traversal
 //! happens there); a node with level `l ≥ 1` additionally owns a boxed slice
 //! of `l` upper-layer blocks.
 //!
 //! All words are `AtomicU32`. During a parallel build, threads read lists
 //! that other threads are rewriting; atomics make that well-defined without
-//! taking a lock on the read path. Writers serialise per node through the
+//! taking a lock on the read path. Writers serialize per node through the
 //! index's node locks and publish a new list by storing the ids first and the
 //! count last (`Release`); readers load the count first (`Acquire`). A reader
 //! racing with a rewrite may see a mix of old and new ids, all of which are
 //! valid node ids, so the worst outcome is a slightly worse search path, never
 //! an out-of-bounds access.
 //!
-//! On the read path, neighbour ids are `Relaxed` loads, which compile to plain
+//! On the read path, neighbor ids are `Relaxed` loads, which compile to plain
 //! loads on `x86_64` and `aarch64`. The count is an `Acquire` load: a plain
 //! `MOV` on `x86_64`, but an `LDAPR` on `aarch64`, an ordered load, once per
 //! list read. Its cost was not measured separately.
@@ -58,7 +58,7 @@ impl Links {
         self.upper.push(zeroed(level * (self.m + 1)).collect());
     }
 
-    /// Neighbour capacity of `layer`.
+    /// Neighbor capacity of `layer`.
     #[inline]
     pub(crate) fn capacity(&self, layer: usize) -> usize {
         if layer == 0 { self.m0 } else { self.m }
@@ -68,7 +68,7 @@ impl Links {
     ///
     /// Panics if `layer` is above the node's level; callers only follow links
     /// on layers where both endpoints exist, which insertion and
-    /// deserialisation guarantee.
+    /// deserialization guarantee.
     #[inline]
     fn block(&self, id: u32, layer: usize) -> (&AtomicU32, &[AtomicU32]) {
         let id = id as usize;
@@ -83,7 +83,7 @@ impl Links {
         (count, slots)
     }
 
-    /// Calls `f` for each neighbour of `id` on `layer`.
+    /// Calls `f` for each neighbor of `id` on `layer`.
     #[inline]
     pub(crate) fn for_each(&self, id: u32, layer: usize, mut f: impl FnMut(u32)) {
         let (count, slots) = self.block(id, layer);
@@ -93,19 +93,19 @@ impl Links {
         }
     }
 
-    /// Copies the neighbours of `id` on `layer` into `out` (cleared first).
+    /// Copies the neighbors of `id` on `layer` into `out` (cleared first).
     pub(crate) fn read_into(&self, id: u32, layer: usize, out: &mut Vec<u32>) {
         out.clear();
         self.for_each(id, layer, |n| out.push(n));
     }
 
-    /// Number of neighbours of `id` on `layer`.
+    /// Number of neighbors of `id` on `layer`.
     pub(crate) fn degree(&self, id: u32, layer: usize) -> usize {
         let (count, slots) = self.block(id, layer);
         (count.load(Ordering::Acquire) as usize).min(slots.len())
     }
 
-    /// Replaces the neighbour list of `id` on `layer`.
+    /// Replaces the neighbor list of `id` on `layer`.
     ///
     /// The caller must hold the node's lock (or have exclusive access), and
     /// `neighbors` must fit the layer's capacity.
@@ -113,7 +113,7 @@ impl Links {
         let (count, slots) = self.block(id, layer);
         assert!(
             neighbors.len() <= slots.len(),
-            "neighbour list over capacity"
+            "neighbor list over capacity"
         );
         for (slot, &n) in slots.iter().zip(neighbors) {
             slot.store(n, Ordering::Relaxed);

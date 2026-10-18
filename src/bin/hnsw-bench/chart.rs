@@ -17,8 +17,8 @@ const LEFT: f64 = 78.0;
 const RIGHT: f64 = 230.0;
 const TOP: f64 = 48.0;
 const BOTTOM: f64 = 64.0;
-/// Colour-blind-safe palette (Okabe & Ito, 2008).
-const COLOURS: [&str; 8] = [
+/// Color-blind-safe palette (Okabe & Ito, 2008).
+const COLORS: [&str; 8] = [
     "#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#000000", "#F0E442",
 ];
 
@@ -89,7 +89,7 @@ pub(crate) fn render(title: &str, subtitle: &str, x_label: &str, series: &[Serie
     );
     // Series and legend.
     for (i, s) in series.iter().enumerate() {
-        let colour = COLOURS[i % COLOURS.len()];
+        let color = COLORS[i % COLORS.len()];
         let path: Vec<String> = s
             .points
             .iter()
@@ -97,13 +97,13 @@ pub(crate) fn render(title: &str, subtitle: &str, x_label: &str, series: &[Serie
             .collect();
         let _ = writeln!(
             svg,
-            r#"<polyline points="{}" fill="none" stroke="{colour}" stroke-width="2"/>"#,
+            r#"<polyline points="{}" fill="none" stroke="{color}" stroke-width="2"/>"#,
             path.join(" ")
         );
         for &(x, y) in &s.points {
             let _ = writeln!(
                 svg,
-                r#"<circle cx="{:.1}" cy="{:.1}" r="3.5" fill="{colour}"/>"#,
+                r#"<circle cx="{:.1}" cy="{:.1}" r="3.5" fill="{color}"/>"#,
                 sx(x),
                 sy(y)
             );
@@ -112,7 +112,7 @@ pub(crate) fn render(title: &str, subtitle: &str, x_label: &str, series: &[Serie
             &mut svg,
             LEFT + plot_w + 14.0,
             TOP + 10.0 + i as f64 * 36.0,
-            colour,
+            color,
             &s.label,
         );
     }
@@ -121,7 +121,7 @@ pub(crate) fn render(title: &str, subtitle: &str, x_label: &str, series: &[Serie
 }
 
 /// A legend swatch at `(x, y)` followed by `label`, one text line per `\n`.
-fn legend_entry(svg: &mut String, x: f64, y: f64, colour: &str, label: &str) {
+fn legend_entry(svg: &mut String, x: f64, y: f64, color: &str, label: &str) {
     let tx = x + 26.0;
     let mut lines = String::new();
     for (j, line) in label.split('\n').enumerate() {
@@ -134,7 +134,7 @@ fn legend_entry(svg: &mut String, x: f64, y: f64, colour: &str, label: &str) {
     }
     let _ = writeln!(
         svg,
-        r##"<line x1="{x:.1}" y1="{y}" x2="{:.1}" y2="{y}" stroke="{colour}" stroke-width="2"/><text y="{:.1}" fill="#111">{lines}</text>"##,
+        r##"<line x1="{x:.1}" y1="{y}" x2="{:.1}" y2="{y}" stroke="{color}" stroke-width="2"/><text y="{:.1}" fill="#111">{lines}</text>"##,
         x + 20.0,
         y + 4.0,
     );

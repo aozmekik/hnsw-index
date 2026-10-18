@@ -1,7 +1,7 @@
 # Build output
 /target/
 
-# Coverage and profiling artefacts
+# Coverage and profiling artifacts
 *.profraw
 *.profdata
 /lcov.info

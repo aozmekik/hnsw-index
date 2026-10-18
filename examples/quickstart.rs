@@ -17,7 +17,7 @@ fn main() -> Result<(), Error> {
 
     let query = data.query(0);
     let hits = index.search(query, 5, 64)?;
-    println!("5 nearest neighbours of query 0:");
+    println!("5 nearest neighbors of query 0:");
     for hit in &hits {
         println!("  key {:>5}  squared L2 {:.3}", hit.key, hit.distance);
     }

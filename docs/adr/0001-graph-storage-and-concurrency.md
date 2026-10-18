@@ -6,13 +6,13 @@
 ## Context
 
 HNSW search is dominated by two memory access patterns: reading a node's
-neighbour list and reading the vectors of those neighbours. The index must
+neighbor list and reading the vectors of those neighbors. The index must
 support
 
 1. many concurrent searches on one index (`HnswIndex: Send + Sync`, search
    through `&self`), and
 2. parallel batch construction with rayon, where every insertion both reads
-   the graph (searching for neighbours) and writes it (adding back-links to
+   the graph (searching for neighbors) and writes it (adding back-links to
    existing nodes, shrinking their lists).
 
 The read path must stay as fast as a single-threaded implementation, and
@@ -20,15 +20,15 @@ everything must be expressible in safe Rust outside the SIMD kernels.
 
 ## Options considered
 
-1. **`RwLock<Vec<u32>>` per node and layer.** Simple, but every neighbour-list
+1. **`RwLock<Vec<u32>>` per node and layer.** Simple, but every neighbor-list
    read during search takes a lock (an atomic read-modify-write on a shared
    cache line), and a `Vec` per list costs an allocation and a pointer chase.
 2. **Build into a mutable structure, then freeze into an immutable CSR layout.**
    Fastest reads, but every later `insert` needs a rebuild or a second,
    mutable overlay.
 3. **hnswlib's approach: plain memory, a mutex per node for writers, racy
-   unsynchronised reads.** Fast, but the concurrent reads are data races, which
-   are undefined behaviour in Rust (and, strictly, in C++).
+   unsynchronized reads.** Fast, but the concurrent reads are data races, which
+   are undefined behavior in Rust (and, strictly, in C++).
 4. **Fixed-capacity blocks of `AtomicU32`, a mutex per node for writers,
    lock-free atomic reads.** Each node owns one block per layer: a count word
    followed by `M0` (layer 0) or `M` (upper layers) id slots. Writers hold the
@@ -54,17 +54,17 @@ point) is only ever acquired before any node lock. Reads never lock.
 
 ## Consequences
 
-- Neighbour ids are read with `Relaxed` loads, which compile to ordinary
+- Neighbor ids are read with `Relaxed` loads, which compile to ordinary
   loads on x86-64 and AArch64. The count is read with an `Acquire` load: an
   ordinary `MOV` on x86-64, but `LDAPR` (an ordered load) on AArch64, once
-  per neighbour list read. That is the whole read-side price of thread
+  per neighbor list read. That is the whole read-side price of thread
   safety; it was not measured separately. There is no `unsafe` in the graph
   code.
-- A reader racing with a rewrite may see a mix of old and new neighbour ids.
+- A reader racing with a rewrite may see a mix of old and new neighbor ids.
   Every id it can see is a valid node id (all storage for a batch is allocated
   before linking starts), so the worst case is a slightly different search
   path during construction, never an out-of-bounds access.
-- Fixed capacity wastes memory for nodes with fewer than `M0` neighbours; with
+- Fixed capacity wastes memory for nodes with fewer than `M0` neighbors; with
   `M = 16`, layer 0 costs `(32 + 1) × 4 = 132` bytes per node regardless of
   degree. In exchange there is no per-list allocation and the layer-0 block of
   node `i` is found by multiplication.

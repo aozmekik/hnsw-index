@@ -6,7 +6,7 @@
 ## Context
 
 The paper does not define deletion. Removing a node from an HNSW graph
-physically means repairing the neighbour lists of every node that pointed to
+physically means repairing the neighbor lists of every node that pointed to
 it, on every layer, without disconnecting parts of the graph. Callers still
 expect `remove(key)` to take effect immediately.
 
@@ -14,10 +14,10 @@ expect `remove(key)` to take effect immediately.
 
 1. **Tombstones only.** Mark the node deleted; searches route through it but
    never return it. Memory is never reclaimed.
-2. **In-place repair.** On delete, reconnect each in-neighbour of the deleted
-   node using its other neighbours (as in FreshDiskANN, or hnswlib's
+2. **In-place repair.** On delete, reconnect each in-neighbor of the deleted
+   node using its other neighbors (as in FreshDiskANN, or hnswlib's
    `replace_deleted` mode that reuses the slot for the next insert). Needs
-   reverse edges or a full scan to find in-neighbours, and repair quality is
+   reverse edges or a full scan to find in-neighbors, and repair quality is
    hard to test.
 3. **Tombstones plus an explicit rebuild.** As option 1, plus
    `compact()`, which rebuilds the graph from the live vectors.

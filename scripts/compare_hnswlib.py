@@ -71,14 +71,14 @@ def gaussian(n: int, queries: int, dim: int, seed: int):
 def clustered(n: int, queries: int, dim: int, clusters: int, seed: int):
     spread = 0.35
     rng = SplitMix64(seed)
-    centres = [rng.next_gaussian() for _ in range(clusters * dim)]
+    centers = [rng.next_gaussian() for _ in range(clusters * dim)]
 
     def sample(count: int) -> np.ndarray:
         out = []
         for _ in range(count):
             c = rng.next_below(clusters)
-            centre = centres[c * dim : (c + 1) * dim]
-            out.extend(x + spread * rng.next_gaussian() for x in centre)
+            center = centers[c * dim : (c + 1) * dim]
+            out.extend(x + spread * rng.next_gaussian() for x in center)
         return np.array(out, dtype=np.float32).reshape(count, dim)
 
     return sample(n), sample(queries)

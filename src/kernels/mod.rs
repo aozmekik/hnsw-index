@@ -4,10 +4,10 @@
 //! `f32` slices: the dot product and the squared Euclidean distance. Each
 //! primitive has up to four implementations, one per [`Backend`]:
 //!
-//! | Backend | How it is vectorised | Availability |
+//! | Backend | How it is vectorized | Availability |
 //! |---|---|---|
 //! | [`Backend::Scalar`] | not at all: one accumulator, strict left-to-right order | everywhere (reference) |
-//! | [`Backend::Portable`] | 16 independent accumulators that LLVM auto-vectorises for the compile target | everywhere |
+//! | [`Backend::Portable`] | 16 independent accumulators that LLVM auto-vectorizes for the compile target | everywhere |
 //! | [`Backend::Neon`] | `std::arch::aarch64` intrinsics, four FMA chains | `aarch64` + runtime check |
 //! | [`Backend::Avx2`] | `std::arch::x86_64` AVX2 + FMA intrinsics, four FMA chains | `x86_64` + runtime check |
 //!
@@ -17,7 +17,7 @@
 //! they measure within a few percent of the portable kernels (see the README
 //! benchmarks). They are preferred because their instruction sequence (fused
 //! multiply-adds, which also round once instead of twice) does not depend on
-//! what the auto-vectoriser makes of a loop for a given compiler and target.
+//! what the auto-vectorizer makes of a loop for a given compiler and target.
 //! Different backends add the same products in a different order, so their
 //! results agree only up to floating-point rounding; the test suite checks each
 //! backend against [`Backend::Scalar`] with a tolerance proportional to the
@@ -55,7 +55,7 @@ mod x86;
 pub enum Backend {
     /// Straightforward single-accumulator loops; the reference implementation.
     Scalar,
-    /// Chunked loops with independent accumulators that auto-vectorise.
+    /// Chunked loops with independent accumulators that auto-vectorize.
     Portable,
     /// Hand-written NEON intrinsics (`aarch64` only).
     Neon,

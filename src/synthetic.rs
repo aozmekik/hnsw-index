@@ -91,8 +91,8 @@ impl Dataset {
         Self { dim, base, queries }
     }
 
-    /// A Gaussian mixture: `clusters` centres with standard normal components,
-    /// and points scattered around a uniformly chosen centre with standard
+    /// A Gaussian mixture: `clusters` centers with standard normal components,
+    /// and points scattered around a uniformly chosen center with standard
     /// deviation 0.35 per component.
     ///
     /// # Panics
@@ -104,14 +104,14 @@ impl Dataset {
         assert!(dim > 0, "dim must be positive");
         assert!(clusters > 0, "clusters must be positive");
         let mut rng = SplitMix64::new(seed);
-        let centres: Vec<f64> = (0..clusters * dim).map(|_| rng.next_gaussian()).collect();
+        let centers: Vec<f64> = (0..clusters * dim).map(|_| rng.next_gaussian()).collect();
         let mut sample = |count: usize| -> Vec<f32> {
             let mut out = Vec::with_capacity(count * dim);
             for _ in 0..count {
                 let c = rng.next_below(clusters);
-                let centre = &centres[c * dim..(c + 1) * dim];
+                let center = &centers[c * dim..(c + 1) * dim];
                 out.extend(
-                    centre
+                    center
                         .iter()
                         .map(|&x| (x + SPREAD * rng.next_gaussian()) as f32),
                 );

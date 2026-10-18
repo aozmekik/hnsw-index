@@ -37,7 +37,7 @@ OPTIONS:
     --queries <N>             query vectors, drawn after (so disjoint from) the base set [default: 1000]
     --dim <D>                 dimension [default: 128]
     --clusters <C>            mixture components for the clustered dataset [default: 100]
-    --k <K>                   neighbours per query [default: 10]
+    --k <K>                   neighbors per query [default: 10]
     --m <M>                   HNSW M [default: 16]
     --ef-construction <EF>    HNSW efConstruction [default: 200]
     --ef <LIST>               search ef values, comma-separated [default: 16,32,64,128,256]

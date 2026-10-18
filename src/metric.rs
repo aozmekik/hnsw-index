@@ -23,7 +23,7 @@ pub enum Metric {
     InnerProduct,
     /// Cosine distance `1 − cos(a, b)`, in `[0, 2]`.
     ///
-    /// Vectors and queries are normalised to unit length when they enter the
+    /// Vectors and queries are normalized to unit length when they enter the
     /// index, so each comparison is a single dot product. Zero vectors are
     /// rejected with [`Error::ZeroVector`](crate::Error::ZeroVector).
     Cosine,

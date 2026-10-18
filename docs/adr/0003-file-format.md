@@ -12,7 +12,7 @@ therefore treat its input as untrusted: any byte sequence must produce either
 a valid index or an error, never a panic or an out-of-bounds access, and the
 memory it allocates must stay within a limit the caller controls.
 
-That last point is harder than it looks. Neighbour lists have a fixed
+That last point is harder than it looks. Neighbor lists have a fixed
 capacity per node (ADR 0001), so the index a file describes can be far larger
 than the file: a node whose lists are all empty costs a few bytes on disk but
 `(M0 + 1) × 4` bytes of layer-0 storage, plus `(M + 1) × 4` bytes for every
@@ -46,7 +46,7 @@ Option 3, documented field by field in `src/hnsw/io.rs`:
 - allocation in three steps, before any graph storage exists: every column
   is located in the input as a borrowed slice (a node count larger than the
   input is `Truncated` without allocating); the adjacency section is walked
-  once without allocating, so every neighbour list the file makes the loader
+  once without allocating, so every neighbor list the file makes the loader
   allocate must be present; and the heap size of the described index,
   computed from the header and level column exactly as `memory_usage()` will
   report it, must not exceed a limit. `from_bytes` allows 64 times the input
@@ -56,8 +56,8 @@ Option 3, documented field by field in `src/hnsw/io.rs`:
   `mL`;
 - every vector accepted by the same check as `insert` (finite components,
   bounded squared norm), cosine vectors of unit length,
-  tombstone flags 0 or 1, live keys unique, neighbour counts within capacity,
-  neighbour ids in range, unique within their list, not self-loops and
+  tombstone flags 0 or 1, live keys unique, neighbor counts within capacity,
+  neighbor ids in range, unique within their list, not self-loops and
   present on the layer they are linked on, and the entry point on the top
   level;
 - no trailing bytes.
@@ -69,7 +69,7 @@ reading from an untrusted stream cap its length with `Read::take`.
 ## Consequences
 
 - Honest indexes need far less than the default limit. One-dimensional
-  vectors are the worst case (the heuristic keeps about four neighbours per
+  vectors are the worst case (the heuristic keeps about four neighbors per
   node, so files are small), and a 20,000-node one-dimensional index with
   `M0 = 256` and the default `mL` needs 32 times its file size (unit test
   `default_memory_limit_admits_low_dimensional_indexes_with_m0_256`, which
