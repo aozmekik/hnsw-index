@@ -13,7 +13,7 @@ pub(crate) const MAX_LEVEL_MULTIPLIER: f64 = 10.0;
 
 /// How a node chooses its neighbours from a candidate list.
 ///
-/// Both strategies come from Malkov & Yashunin (2018): `Simple` is
+/// Both strategies come from Malkov & Yashunin (TPAMI 2020): `Simple` is
 /// SELECT-NEIGHBORS-SIMPLE (Algorithm 3), `Heuristic` is
 /// SELECT-NEIGHBORS-HEURISTIC (Algorithm 4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -68,9 +68,11 @@ pub struct HnswParams {
 }
 
 impl HnswParams {
-    /// Parameters with `M = m` and the paper's recommended derived values:
-    /// `M0 = 2·M`, `mL = 1 / ln(M)`, `efConstruction = 200`, heuristic
-    /// selection and seed 0.
+    /// Parameters with `M = m`, the derived values the paper recommends
+    /// (`M0 = 2·M`, `mL = 1 / ln(M)`, heuristic selection), seed 0 and
+    /// `efConstruction = 200`. The paper ties `efConstruction` to the recall
+    /// wanted during construction rather than fixing it; 200 is hnswlib's
+    /// default.
     ///
     /// Values are validated when an index is created, so this never fails.
     #[must_use]
@@ -192,7 +194,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_follow_the_paper() {
+    fn defaults_follow_the_paper_and_hnswlib() {
         let p = HnswParams::default();
         assert_eq!((p.m(), p.m0(), p.ef_construction()), (16, 32, 200));
         assert!((p.level_multiplier() - 1.0 / 16_f64.ln()).abs() < 1e-15);

@@ -3,7 +3,8 @@
 //!
 //! > Yu. A. Malkov and D. A. Yashunin, "Efficient and robust approximate
 //! > nearest neighbor search using Hierarchical Navigable Small World graphs",
-//! > IEEE TPAMI 42(4), 2018. [arXiv:1603.09320](https://arxiv.org/abs/1603.09320)
+//! > IEEE TPAMI 42(4):824–836, 2020 (published online 2018).
+//! > [arXiv:1603.09320](https://arxiv.org/abs/1603.09320)
 //!
 //! # Overview
 //!

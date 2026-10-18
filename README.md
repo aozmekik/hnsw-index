@@ -12,7 +12,7 @@ a validated on-disk format.
 
 ## Why it exists
 
-HNSW (Malkov & Yashunin, 2018) is the graph index behind most vector search
+HNSW (Malkov & Yashunin) is the graph index behind many vector search
 systems. This crate implements it directly from the paper, as a compact,
 readable codebase that is also careful about the parts papers leave out:
 searching from many threads without data races, building in parallel without
@@ -104,7 +104,7 @@ Runnable examples live in [`examples/`](examples): `quickstart`,
 | Item | Purpose |
 |---|---|
 | `HnswIndex::new(dim, metric, params)` | Empty index; validates `dim` and parameters. |
-| `HnswParams::new(m)` | `M`, with `M0 = 2M`, `mL = 1/ln M`, `efConstruction = 200`; builder methods `with_m0`, `with_ef_construction`, `with_level_multiplier`, `with_selection`, `with_seed`. |
+| `HnswParams::new(m)` | `M`, with `M0 = 2M` and `mL = 1/ln M` (the paper's recommendations) and `efConstruction = 200` (hnswlib's default); builder methods `with_m0`, `with_ef_construction`, `with_level_multiplier`, `with_selection`, `with_seed`. |
 | `insert(key, &[f32])`, `insert_batch(&keys, &flat)`, `reserve(n)` | Add vectors under caller-chosen `u64` keys. A batch is validated as a whole before anything is inserted and linked in parallel. |
 | `search(q, k, ef)`, `search_filtered(q, k, ef, f)`, `search_with(q, k, &SearchOptions)`, `search_batch(&flat, k, ef)` | Approximate k-NN, closest first, as `Neighbor { key, distance }`. |
 | `remove(key)`, `compact()` | Tombstone a key; rebuild without tombstones. |
@@ -126,15 +126,17 @@ smaller is always closer.
   Neighbour lists are fixed-capacity blocks of `AtomicU32` (count, then ids):
   one contiguous array for layer 0, a boxed slice per node for upper layers.
   Writers take a per-node lock and publish the count last; readers never lock.
-  Relaxed atomic loads compile to plain loads, so search pays nothing for
-  thread safety, and the graph code has no `unsafe`. Every critical section
+  Neighbour ids are `Relaxed` loads (plain loads); the count is an `Acquire`
+  load, free on x86-64 and an `LDAPR` on AArch64, once per list. The graph
+  code has no `unsafe`. Every critical section
   holds a single node lock, which makes parallel builds deadlock-free. An
   earlier version that held the inserted node's lock for its whole insertion
   (as hnswlib does) deadlocked under the property tests; the ADR explains why.
 - **Levels by hashing.** A node's level is `⌊−ln(U)·mL⌋` with `U` derived from
   a hash of `(seed, id)`, not from a shared RNG, so levels do not depend on
-  thread scheduling. Sequential builds are reproducible bit for bit; parallel
-  builds are not (interleaving changes the graph) but match in quality.
+  thread scheduling. Sequential builds are reproducible bit for bit on the
+  same CPU and kernel backend (backends round differently); parallel builds
+  are not (interleaving changes the graph) but match in quality.
 - **Deletion** ([ADR 0002](docs/adr/0002-tombstone-deletion-and-compaction.md)).
   Tombstoned nodes keep routing searches but are never returned; `compact()`
   rebuilds from live vectors. In-place graph repair was not attempted.
@@ -341,7 +343,8 @@ are only built and tested by CI.
 - Vectors live in memory as `f32`; there is no memory-mapped or on-disk search.
 - No in-place deletion repair: tombstones cost memory and search time until
   `compact()`, which rebuilds the whole graph.
-- Parallel builds are not reproducible bit for bit (sequential builds are).
+- Parallel builds are not reproducible bit for bit; sequential builds are,
+  but only on the same CPU and kernel backend.
 - Quantization adds memory rather than saving it, and its single global scale
   suits data with similar per-dimension ranges (like the synthetic benchmarks)
   better than skewed real embeddings.
@@ -375,7 +378,8 @@ commands. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 - Yu. A. Malkov and D. A. Yashunin, "Efficient and robust approximate nearest
   neighbor search using Hierarchical Navigable Small World graphs", IEEE
-  Transactions on Pattern Analysis and Machine Intelligence 42(4), 2018.
+  Transactions on Pattern Analysis and Machine Intelligence 42(4):824–836,
+  2020 (published online 2018).
   [arXiv:1603.09320](https://arxiv.org/abs/1603.09320). The algorithms and
   parameter names follow this paper.
 - [hnswlib](https://github.com/nmslib/hnswlib): the authors' C++

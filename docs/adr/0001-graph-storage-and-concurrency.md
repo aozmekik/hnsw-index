@@ -54,9 +54,12 @@ point) is only ever acquired before any node lock. Reads never lock.
 
 ## Consequences
 
-- Relaxed atomic loads compile to ordinary loads on x86-64 and AArch64, so
-  single-threaded search pays nothing for thread safety, and there is no
-  `unsafe` in the graph code.
+- Neighbour ids are read with `Relaxed` loads, which compile to ordinary
+  loads on x86-64 and AArch64. The count is read with an `Acquire` load: an
+  ordinary `MOV` on x86-64, but `LDAPR` (an ordered load) on AArch64, once
+  per neighbour list read. That is the whole read-side price of thread
+  safety; it was not measured separately. There is no `unsafe` in the graph
+  code.
 - A reader racing with a rewrite may see a mix of old and new neighbour ids.
   Every id it can see is a valid node id (all storage for a batch is allocated
   before linking starts), so the worst case is a slightly different search
@@ -66,9 +69,12 @@ point) is only ever acquired before any node lock. Reads never lock.
   degree. In exchange there is no per-list allocation and the layer-0 block of
   node `i` is found by multiplication.
 - Parallel builds are not bit-for-bit reproducible (insertion interleaving
-  changes the graph); sequential `insert` loops are. Node levels are a hash of
-  `(seed, id)` rather than a stateful RNG draw, so levels at least are
-  identical across thread counts.
+  changes the graph); sequential `insert` loops are, on the same kernel
+  backend. Different backends round distances differently (NEON and AVX2
+  fuse multiply and add, the portable kernels do not), so the same
+  sequential build can produce a different graph on another CPU. Node levels
+  are a hash of `(seed, id)` rather than a stateful RNG draw, so levels at
+  least are identical across thread counts and machines.
 - An earlier variant held the inserted node's lock for its whole insertion, as
   hnswlib does, to stop concurrent back-links from being overwritten. The
   property tests deadlocked with it: a node carried over as an entry point from

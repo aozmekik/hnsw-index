@@ -3,7 +3,6 @@
 //! Run with `cargo run --release --example persistence`.
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
 
 use hnsw_index::synthetic::Dataset;
 use hnsw_index::{Error, FormatError, HnswIndex, HnswParams, Metric};
@@ -16,11 +15,13 @@ fn main() -> Result<(), Error> {
     index.remove(42);
 
     let path = std::env::temp_dir().join(format!("hnsw-index-example-{}.hnsw", std::process::id()));
-    index.write_to(BufWriter::new(File::create(&path)?))?;
+    // `write_to` buffers internally and `read_from` reads the whole file at
+    // once, so neither needs a `BufWriter` or `BufReader`.
+    index.write_to(File::create(&path)?)?;
     let size = std::fs::metadata(&path)?.len();
     println!("wrote {} ({size} bytes)", path.display());
 
-    let loaded = HnswIndex::read_from(BufReader::new(File::open(&path)?))?;
+    let loaded = HnswIndex::read_from(File::open(&path)?)?;
     for q in 0..data.query_len() {
         assert_eq!(
             loaded.search(data.query(q), 10, 64)?,

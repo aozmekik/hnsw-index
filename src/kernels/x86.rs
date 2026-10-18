@@ -14,7 +14,8 @@ use std::arch::x86_64::{
 ///
 /// # Safety
 ///
-/// The CPU must support AVX.
+/// The CPU must support AVX2 and FMA (the features this function is compiled
+/// with).
 #[inline]
 #[target_feature(enable = "avx2,fma")]
 unsafe fn horizontal_sum(v: __m256) -> f32 {

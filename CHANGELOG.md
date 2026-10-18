@@ -11,7 +11,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before
 
 ### Added
 
-- `HnswIndex`: HNSW after Malkov & Yashunin (2018) with level sampling
+- `HnswIndex`: HNSW after Malkov & Yashunin (TPAMI 2020) with level sampling
   (`mL = 1/ln M`), greedy upper-layer descent, ef-bounded layer-0 search, and
   simple or heuristic neighbour selection (`extendCandidates`,
   `keepPrunedConnections`); parameters `M`, `M0`, `efConstruction`.

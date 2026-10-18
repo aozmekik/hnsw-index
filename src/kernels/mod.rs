@@ -11,7 +11,13 @@
 //! | [`Backend::Neon`] | `std::arch::aarch64` intrinsics, four FMA chains | `aarch64` + runtime check |
 //! | [`Backend::Avx2`] | `std::arch::x86_64` AVX2 + FMA intrinsics, four FMA chains | `x86_64` + runtime check |
 //!
-//! [`Kernels::best`] picks the fastest available backend once per process.
+//! [`Kernels::best`] picks the preferred available backend once per process:
+//! a hand-written SIMD backend when the CPU has one, otherwise the portable
+//! one. The hand-written kernels are not always faster: on an Apple M1 Pro
+//! they measure within a few percent of the portable kernels (see the README
+//! benchmarks). They are preferred because their instruction sequence (fused
+//! multiply-adds, which also round once instead of twice) does not depend on
+//! what the auto-vectoriser makes of a loop for a given compiler and target.
 //! Different backends add the same products in a different order, so their
 //! results agree only up to floating-point rounding; the test suite checks each
 //! backend against [`Backend::Scalar`] with a tolerance proportional to the
@@ -156,10 +162,12 @@ impl Kernels {
         Some(Self { backend, dot, l2 })
     }
 
-    /// The fastest available kernels, detected once per process.
+    /// The preferred available kernels, detected once per process.
     ///
-    /// Preference order: AVX2, NEON, portable. The scalar backend is never
-    /// chosen automatically; it exists as a reference.
+    /// Preference order: AVX2, NEON, portable (see the [module
+    /// documentation](self) for why, and for how they compare in speed). The
+    /// scalar backend is never chosen automatically; it exists as a
+    /// reference.
     #[must_use]
     pub fn best() -> Self {
         static BEST: OnceLock<Kernels> = OnceLock::new();

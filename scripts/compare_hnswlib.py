@@ -5,8 +5,12 @@ This is a cross-check of the Rust implementation against the reference C++
 implementation by the paper's first author (https://github.com/nmslib/hnswlib).
 It reimplements `hnsw_index::synthetic::Dataset` (SplitMix64 + Box-Muller), so
 both libraries see the same vectors, and prints recall@k per (M, ef) together
-with single-threaded queries per CPU-second (process CPU time, so the figure is
-comparable with the "per CPU-second" column of `hnsw-bench`).
+with single-threaded queries per CPU-second (process CPU time, measured the
+same way as the "per CPU-second" column of `hnsw-bench`).
+
+The recall figures are comparable on any machine. The speed figures are only
+a fair comparison on x86: hnswlib 0.8.0 has hand-written SIMD distance
+functions for SSE/AVX/AVX-512 only, so on arm64 it runs scalar loops.
 
 hnswlib and numpy are not dependencies of this repository; install them in a
 throwaway virtual environment:

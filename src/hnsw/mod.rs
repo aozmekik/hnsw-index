@@ -124,7 +124,7 @@ pub struct GraphStats {
 /// A Hierarchical Navigable Small World graph over fixed-dimension `f32`
 /// vectors, after Malkov & Yashunin, "Efficient and robust approximate nearest
 /// neighbor search using Hierarchical Navigable Small World graphs"
-/// (IEEE TPAMI 2018, arXiv:1603.09320).
+/// (IEEE TPAMI 42(4), 2020; arXiv:1603.09320).
 ///
 /// Vectors are identified by caller-chosen `u64` keys. Search takes `&self`
 /// and the type is `Send + Sync`, so any number of threads can search one
@@ -306,8 +306,9 @@ impl HnswIndex {
     ///
     /// Use [`rayon::ThreadPool::install`] to control the thread count. The
     /// resulting graph depends on thread scheduling, so unlike repeated
-    /// [`insert`](Self::insert) calls it is not bit-for-bit reproducible; its
-    /// search quality is equivalent (see the README benchmarks).
+    /// [`insert`](Self::insert) calls (which give the same graph on the same
+    /// kernel backend) it is not bit-for-bit reproducible; its search quality
+    /// is equivalent (see the README benchmarks).
     ///
     /// # Errors
     ///
@@ -514,7 +515,8 @@ impl HnswIndex {
     /// # Errors
     ///
     /// [`Error::DimensionMismatch`] if `queries.len()` is not a multiple of
-    /// the dimension, or the first query validation error.
+    /// the dimension, or a query validation error. Queries run in parallel,
+    /// so if several are invalid, which error is returned is unspecified.
     pub fn search_batch(
         &self,
         queries: &[f32],

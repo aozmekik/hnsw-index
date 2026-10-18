@@ -18,8 +18,9 @@ fn ground_truth(data: &Dataset, metric: Metric) -> Vec<Vec<hnsw_index::Neighbor>
     exact.search_batch(data.queries(), K).unwrap()
 }
 
-/// Sequential insertion: the graph is a pure function of the data and seed,
-/// so the measured recall is identical on every run.
+/// Sequential insertion: the graph is a pure function of the data, the seed
+/// and the kernel backend, so the measured recall is identical on every run
+/// on the same kind of CPU.
 fn sequential(data: &Dataset, metric: Metric, m: usize) -> HnswIndex {
     let mut index = HnswIndex::new(data.dim(), metric, HnswParams::new(m)).unwrap();
     for i in 0..data.base_len() {

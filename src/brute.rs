@@ -164,7 +164,8 @@ impl BruteForceIndex {
     /// # Errors
     ///
     /// [`Error::DimensionMismatch`] if `queries.len()` is not a multiple of
-    /// the dimension, or the first query validation error.
+    /// the dimension, or a query validation error. Queries run in parallel,
+    /// so if several are invalid, which error is returned is unspecified.
     pub fn search_batch(&self, queries: &[f32], k: usize) -> Result<Vec<Vec<Neighbor>>, Error> {
         if !queries.len().is_multiple_of(self.dim) {
             return Err(Error::DimensionMismatch {

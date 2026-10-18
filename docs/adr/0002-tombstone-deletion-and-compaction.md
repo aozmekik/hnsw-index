@@ -34,11 +34,15 @@ keys and parameters.
 ## Consequences
 
 - Deletion is immediate and cannot degrade the graph structure.
-- Tombstones keep costing memory and some search time (they are visited but
-  useless) until `compact()` runs. With many tombstones and a selective
-  workload, a search must expand more nodes to collect `k` live results.
-- `compact()` costs about as much as building a new index of the live size and
-  briefly needs memory for both copies. It also re-samples node levels and is
-  not reproducible bit-for-bit, like any parallel build.
+- Tombstones keep costing memory and search time (they are expanded but
+  never returned) until `compact()` runs. The more of the graph is
+  tombstoned, the more nodes a search must expand to collect `ef` live
+  results, so search time grows with the tombstone share; `deleted_len()`
+  next to `len()` tells callers when compaction is worth its cost.
+- `compact()` costs about as much as building a new index of the live size,
+  and until it returns the old and the new index exist side by side (the
+  live vectors are copied once, straight into the new index). It also
+  re-samples node levels and is not reproducible bit-for-bit, like any
+  parallel build.
 - In-place repair (option 2) stays on the roadmap; tombstones are the
   prerequisite for it anyway.

@@ -13,8 +13,12 @@
 //! count last (`Release`); readers load the count first (`Acquire`). A reader
 //! racing with a rewrite may see a mix of old and new ids, all of which are
 //! valid node ids, so the worst outcome is a slightly worse search path, never
-//! an out-of-bounds access. Relaxed atomic loads compile to plain loads on
-//! `x86_64` and `aarch64`, so single-threaded search pays nothing for this.
+//! an out-of-bounds access.
+//!
+//! On the read path, neighbour ids are `Relaxed` loads, which compile to plain
+//! loads on `x86_64` and `aarch64`. The count is an `Acquire` load: a plain
+//! `MOV` on `x86_64`, but an `LDAPR` on `aarch64`, an ordered load, once per
+//! list read. Its cost was not measured separately.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
