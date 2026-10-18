@@ -2,7 +2,8 @@
 //! synthetic data.
 //!
 //! Run `hnsw-bench --help` for options. Results are printed as Markdown tables;
-//! with `--out DIR` they are also written as CSV and SVG charts.
+//! with `--out DIR` they are also written as CSV (`results.csv` for searches,
+//! `builds.csv` for builds) and SVG charts.
 
 #![allow(unsafe_code)] // the counting global allocator in `alloc.rs`
 
@@ -46,7 +47,7 @@ OPTIONS:
     --repeats <R>             timed repetitions per measurement; the median is reported [default: 3]
     --skip-sequential         skip the single-threaded build (the slowest step)
     --skip-simple             skip the simple-selection comparison build
-    --out <DIR>               also write results.csv and SVG charts into DIR
+    --out <DIR>               also write results.md, results.csv, builds.csv and SVG charts into DIR
     --quick                   small smoke run: --n 20000 --queries 200 --repeats 1
     -h, --help                print this help
 ";
@@ -240,6 +241,8 @@ struct Bench<'a> {
     brute_qps: Vec<(Kind, f64)>,
     /// Index whose quantized variant was measured; charted with it.
     primary_label: &'static str,
+    /// 1-minute load average when the run started.
+    load_at_start: Option<f64>,
 }
 
 impl Bench<'_> {
@@ -412,7 +415,8 @@ fn markdown(config: &Config, bench: &Bench<'_>) -> String {
     let _ = writeln!(
         out,
         "Synthetic data: {} base + {} disjoint queries, dim {}, seed {}; M={}, efConstruction={}, k={}; \
-         {} thread(s) for parallel runs; median of {} timed run(s); kernel backend: {}; {} {}. \
+         {} thread(s) for parallel runs; median of {} timed run(s); kernel backend: {}; {} {}; \
+         1-minute load average {} at the start and {} at the end of the run. \
          Wall-clock throughput depends on what else runs on the machine; CPU-time columns count only \
          this process's CPU time.\n",
         config.n,
@@ -427,6 +431,8 @@ fn markdown(config: &Config, bench: &Bench<'_>) -> String {
         hnsw_index::kernels::Kernels::best().backend(),
         std::env::consts::OS,
         std::env::consts::ARCH,
+        fmt_opt(bench.load_at_start, 1),
+        fmt_opt(cpu::load_average(), 1),
     );
     out.push_str("| dataset | build | threads | wall time (s) | CPU time (s) | heap bytes / vector (measured) | memory_usage() / vector |\n");
     out.push_str("|---|---|---:|---:|---:|---:|---:|\n");
@@ -491,6 +497,26 @@ fn csv(config: &Config, bench: &Bench<'_>) -> String {
             s.qps_single,
             fmt_opt(s.qps_single_cpu, 1),
             s.qps_multi
+        );
+    }
+    out
+}
+
+fn builds_csv(config: &Config, bench: &Bench<'_>) -> String {
+    let mut out = String::from(
+        "dataset,build,threads,wall_seconds,cpu_seconds,heap_bytes_per_vector,memory_usage_per_vector\n",
+    );
+    for b in &bench.builds {
+        let _ = writeln!(
+            out,
+            "{},\"{}\",{},{:.3},{},{:.1},{:.1}",
+            b.dataset.name(),
+            b.label,
+            b.threads,
+            b.seconds,
+            fmt_opt(b.cpu_seconds, 3),
+            b.heap_bytes as f64 / config.n as f64,
+            b.estimated_bytes as f64 / config.n as f64,
         );
     }
     out
@@ -581,6 +607,7 @@ fn main() -> ExitCode {
         searches: Vec::new(),
         brute_qps: Vec::new(),
         primary_label: "",
+        load_at_start: cpu::load_average(),
     };
     for &kind in &config.datasets {
         bench.run_dataset(kind);
@@ -597,6 +624,7 @@ fn main() -> ExitCode {
             .map_err(|e| format!("cannot create {}: {e}", dir.display()))
             .and_then(|()| write("results.md", &report))
             .and_then(|()| write("results.csv", &csv(&config, &bench)))
+            .and_then(|()| write("builds.csv", &builds_csv(&config, &bench)))
             .and_then(|()| {
                 charts(&config, &bench)
                     .iter()

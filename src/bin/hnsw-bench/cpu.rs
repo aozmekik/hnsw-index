@@ -1,4 +1,5 @@
-//! Process CPU time (user + system) via `getrusage(2)`.
+//! Process CPU time (user + system) via `getrusage(2)`, and the system load
+//! average via `getloadavg(3)`.
 //!
 //! Wall-clock throughput drops when other processes compete for cores. CPU
 //! time only counts the time this process actually ran, so "queries per CPU
@@ -34,6 +35,17 @@ mod imp {
 
     unsafe extern "C" {
         fn getrusage(who: i32, usage: *mut Rusage) -> i32;
+        fn getloadavg(loadavg: *mut f64, nelem: i32) -> i32;
+    }
+
+    /// The 1-minute load average: the number of runnable threads on the
+    /// whole machine, averaged over the last minute.
+    pub(crate) fn load_average() -> Option<f64> {
+        let mut load = [0.0_f64; 1];
+        // SAFETY: `load` is a writable buffer of exactly one `f64`, and
+        // `nelem = 1` asks for one sample.
+        let n = unsafe { getloadavg(load.as_mut_ptr(), 1) };
+        (n == 1).then_some(load[0])
     }
 
     const RUSAGE_SELF: i32 = 0;
@@ -51,11 +63,17 @@ mod imp {
 }
 
 #[cfg(all(unix, target_pointer_width = "64"))]
-pub(crate) use imp::cpu_seconds;
+pub(crate) use imp::{cpu_seconds, load_average};
 
 /// CPU time is not measured on this platform.
 #[cfg(not(all(unix, target_pointer_width = "64")))]
 pub(crate) fn cpu_seconds() -> Option<f64> {
+    None
+}
+
+/// The load average is not read on this platform.
+#[cfg(not(all(unix, target_pointer_width = "64")))]
+pub(crate) fn load_average() -> Option<f64> {
     None
 }
 
@@ -75,5 +93,12 @@ mod tests {
         std::hint::black_box(x);
         let after = cpu_seconds().unwrap();
         assert!(after > before, "{before} -> {after}");
+    }
+
+    #[test]
+    fn load_average_is_non_negative_where_available() {
+        if let Some(load) = load_average() {
+            assert!(load >= 0.0 && load.is_finite(), "{load}");
+        }
     }
 }
