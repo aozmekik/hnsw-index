@@ -1,6 +1,6 @@
 //! Unit tests with access to the graph internals.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use super::*;
 use crate::synthetic::Dataset;
@@ -38,6 +38,8 @@ fn assert_invariants(index: &HnswIndex) {
                 assert_ne!(nb, id, "self loop");
                 assert!(usize::from(index.levels[nb as usize]) >= layer);
             }
+            let unique: HashSet<u32> = neighbors.iter().copied().collect();
+            assert_eq!(unique.len(), neighbors.len(), "duplicate neighbour");
         }
     }
     if n > 0 {
@@ -220,16 +222,23 @@ fn removed_keys_are_never_returned_and_can_be_reinserted() {
     let data = Dataset::gaussian(300, 5, 8, 9);
     let mut index = build(&data, Metric::L2, HnswParams::default(), false);
     let (entry, _) = index.entry_point().unwrap();
-    // Delete every even key, including the entry point's.
+    let entry_key = index.keys[entry as usize];
+    // Delete every even key, and the entry point's key whatever its parity,
+    // so searches have to start from a tombstone.
     for key in (0..300).step_by(2) {
         assert!(index.remove(key));
     }
+    if index.contains(entry_key) {
+        assert!(index.remove(entry_key));
+    }
+    assert!(index.deleted[entry as usize]);
     assert!(!index.remove(0));
-    assert!(index.remove(u64::from(entry) | 1) || entry % 2 == 1);
     assert!(!index.contains(0));
     for q in 0..data.query_len() {
-        for hit in index.search(data.query(q), 20, 50).unwrap() {
-            assert!(hit.key % 2 == 1 && index.contains(hit.key));
+        let hits = index.search(data.query(q), 20, 50).unwrap();
+        assert_eq!(hits.len(), 20);
+        for hit in hits {
+            assert!(hit.key % 2 == 1 && hit.key != entry_key && index.contains(hit.key));
         }
     }
     // Re-inserting a deleted key creates a fresh node.
@@ -511,7 +520,12 @@ fn loader_rejects_structural_violations() {
     let vectors = levels + 60;
     assert_eq!(
         invalid(vectors, &f32::INFINITY.to_le_bytes()),
-        FormatError::Invalid("vector component")
+        FormatError::Invalid("vector out of range")
+    );
+    // Finite components, but a norm `insert` rejects: distances would overflow.
+    assert_eq!(
+        invalid(vectors, &3e38_f32.to_le_bytes()),
+        FormatError::Invalid("vector out of range")
     );
     let links = vectors + 30 * 4 * 4;
     assert_eq!(
@@ -521,6 +535,13 @@ fn loader_rejects_structural_violations() {
     assert_eq!(
         invalid(links + 4, &999_u32.to_le_bytes()),
         FormatError::Invalid("neighbour id")
+    );
+    let count = u32::from_le_bytes(bytes[links..links + 4].try_into().unwrap());
+    assert!(count >= 2, "node 0 needs two neighbours for this case");
+    let first_neighbour = bytes[links + 4..links + 8].to_vec();
+    assert_eq!(
+        invalid(links + 8, &first_neighbour),
+        FormatError::Invalid("duplicate neighbour id")
     );
     let mut longer = bytes[..bytes.len() - 4].to_vec();
     longer.extend_from_slice(&[0, 0, 0, 0, 0]);
@@ -548,4 +569,67 @@ fn loader_rejects_implausible_levels_before_allocating() {
             "implausible level distribution"
         )))
     ));
+}
+
+#[test]
+fn loader_rejects_vectors_outside_the_cosine_unit_sphere() {
+    let mut index = HnswIndex::new(2, Metric::Cosine, HnswParams::default()).unwrap();
+    index.insert_batch(&[1, 2], &[1.0, 0.0, 0.0, 1.0]).unwrap();
+    let mut bytes = index.to_bytes();
+    let vectors = 56 + 2 * 8 + 2 + 2;
+    bytes[vectors..vectors + 4].copy_from_slice(&2.0_f32.to_le_bytes());
+    assert!(matches!(
+        HnswIndex::from_bytes(&with_valid_crc(bytes)),
+        Err(Error::Format(FormatError::Invalid(
+            "cosine vector is not unit length"
+        )))
+    ));
+}
+
+#[test]
+fn memory_limit_is_the_loaded_memory_usage() {
+    for (metric, quantize) in [(Metric::L2, false), (Metric::Cosine, true)] {
+        let data = Dataset::gaussian(3000, 1, 24, 4);
+        let mut index = build(&data, metric, HnswParams::new(12), true);
+        if quantize {
+            index.enable_quantization();
+        }
+        let bytes = index.to_bytes();
+        let Err(Error::MemoryLimitExceeded { required, limit: 0 }) =
+            HnswIndex::from_bytes_with_limit(&bytes, 0)
+        else {
+            panic!("a zero limit must be exceeded");
+        };
+        assert!(matches!(
+            HnswIndex::from_bytes_with_limit(&bytes, required - 1),
+            Err(Error::MemoryLimitExceeded { .. })
+        ));
+        let loaded = HnswIndex::from_bytes_with_limit(&bytes, required).unwrap();
+        // The estimate is made before loading; it must describe the result.
+        let usage = loaded.memory_usage();
+        assert!(
+            usage.abs_diff(required) * 1000 <= required,
+            "required {required}, memory_usage {usage}"
+        );
+    }
+}
+
+#[test]
+fn default_memory_limit_admits_low_dimensional_indexes_with_m0_256() {
+    // One-dimensional vectors are the worst case for the ratio of memory to
+    // file size: the heuristic keeps about four neighbours per node, so the
+    // file is small while every node still owns M0 + 1 slots.
+    let data = Dataset::gaussian(20_000, 1, 1, 5);
+    let index = build(&data, Metric::L2, HnswParams::new(128), true);
+    let bytes = index.to_bytes();
+    let Err(Error::MemoryLimitExceeded { required, .. }) =
+        HnswIndex::from_bytes_with_limit(&bytes, 0)
+    else {
+        panic!("a zero limit must be exceeded");
+    };
+    let ratio = required as f64 / bytes.len() as f64;
+    eprintln!("1-d, M0 = 256: memory / file size = {ratio:.1}");
+    assert!(ratio < 48.0, "memory / file size = {ratio}");
+    assert!(io::default_memory_limit(bytes.len()) >= required);
+    assert!(HnswIndex::from_bytes(&bytes).is_ok());
 }

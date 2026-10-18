@@ -17,7 +17,7 @@ systems. This crate implements it directly from the paper, as a compact,
 readable codebase that is also careful about the parts papers leave out:
 searching from many threads without data races, building in parallel without
 deadlocks, deleting vectors, and loading index files that may be corrupt or
-hostile without crashing. Its recall matches
+hostile with an error instead of a crash. Its recall matches
 [hnswlib](https://github.com/nmslib/hnswlib), the authors' C++ library, on
 identical data ([below](#correctness)).
 
@@ -42,8 +42,9 @@ identical data ([below](#correctness)).
   `insert_batch` links vectors in parallel with rayon; `search_batch` searches
   in parallel.
 - **Persistence**: a versioned, CRC-32 checksummed binary format. Loading
-  validates every field, so corrupt or malicious files produce errors, not
-  panics or huge allocations.
+  validates every field and checks the memory the file would need against a
+  limit before allocating it, so corrupt or malicious files produce errors,
+  not panics or out-of-memory aborts.
 - **Optional int8 scalar quantization**: graph traversal on 8-bit codes, then
   exact `f32` re-ranking.
 - **Exact `BruteForceIndex`** for ground truth, `eval::recall_at_k`, and seeded
@@ -108,7 +109,7 @@ Runnable examples live in [`examples/`](examples): `quickstart`,
 | `search(q, k, ef)`, `search_filtered(q, k, ef, f)`, `search_with(q, k, &SearchOptions)`, `search_batch(&flat, k, ef)` | Approximate k-NN, closest first, as `Neighbor { key, distance }`. |
 | `remove(key)`, `compact()` | Tombstone a key; rebuild without tombstones. |
 | `enable_quantization()`, `SearchOptions::quantized(true)` | int8 traversal with exact re-ranking. |
-| `write_to(w)`, `read_from(r)`, `to_bytes()`, `from_bytes(&[u8])` | Persistence. |
+| `write_to(w)`, `read_from(r)`, `to_bytes()`, `from_bytes(&[u8])`, `from_bytes_with_limit(&[u8], max_memory)` | Persistence; loading validates untrusted input and limits memory. |
 | `len`, `contains`, `get`, `stats`, `memory_usage`, `backend` | Introspection. |
 | `BruteForceIndex` | Exact search with the same API shape. |
 | `kernels::{Backend, Kernels}` | Distance primitives per SIMD backend. |
@@ -139,8 +140,11 @@ smaller is always closer.
   rebuilds from live vectors. In-place graph repair was not attempted.
 - **File format** ([ADR 0003](docs/adr/0003-file-format.md)). Fixed header,
   columnar sections, CRC-32 trailer. The loader checks magic, version and
-  checksum, then every invariant, and bounds allocations by the input size and
-  a plausibility check of the level distribution.
+  checksum, then every invariant. Because neighbour lists have a fixed
+  capacity, a small file can describe a large index, so before allocating
+  graph storage the loader checks that every list is present and that the
+  described index fits a memory limit (64 times the input size or 64 MiB by
+  default; `from_bytes_with_limit` sets another).
 - **Quantization** ([ADR 0004](docs/adr/0004-scalar-quantization.md)).
   Symmetric int8 codes with one global scale (per-dimension centring for L2),
   exact integer distances, used only to navigate; the final `ef` candidates

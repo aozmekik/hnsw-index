@@ -37,6 +37,15 @@ pub enum Error {
     Io(io::Error),
     /// The serialized bytes are not a valid index.
     Format(FormatError),
+    /// A serialized index describes an index that would need more memory than
+    /// the loader was allowed to allocate (see
+    /// [`HnswIndex::from_bytes_with_limit`](crate::HnswIndex::from_bytes_with_limit)).
+    MemoryLimitExceeded {
+        /// Heap bytes the loaded index would hold.
+        required: usize,
+        /// The limit in effect.
+        limit: usize,
+    },
 }
 
 /// Reasons a serialized index is rejected by [`HnswIndex::from_bytes`](crate::HnswIndex::from_bytes).
@@ -89,6 +98,10 @@ impl fmt::Display for Error {
             }
             Self::Io(err) => write!(f, "I/O error: {err}"),
             Self::Format(err) => write!(f, "invalid index file: {err}"),
+            Self::MemoryLimitExceeded { required, limit } => write!(
+                f,
+                "loading the index needs {required} bytes of memory, more than the limit of {limit}"
+            ),
         }
     }
 }
@@ -151,6 +164,14 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "invalid index file: checksum mismatch: stored 0x00000001, computed 0x00000002"
+        );
+        let err = Error::MemoryLimitExceeded {
+            required: 300,
+            limit: 200,
+        };
+        assert_eq!(
+            err.to_string(),
+            "loading the index needs 300 bytes of memory, more than the limit of 200"
         );
     }
 

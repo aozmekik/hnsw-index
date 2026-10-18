@@ -8,7 +8,7 @@ use crate::{Error, Metric};
 ///
 /// A vector whose squared norm exceeds `f32::MAX` is rejected even though its
 /// components are finite: distances involving it would overflow to infinity.
-fn check(dim: usize, vector: &[f32]) -> Result<f64, Error> {
+pub(crate) fn check(dim: usize, vector: &[f32]) -> Result<f64, Error> {
     if vector.len() != dim {
         return Err(Error::DimensionMismatch {
             expected: dim,

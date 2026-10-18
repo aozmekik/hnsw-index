@@ -29,27 +29,42 @@
 //!
 //! Loading treats the input as untrusted. The magic, version and checksum are
 //! checked first; then every field is validated before it is used: enum tags,
-//! parameter ranges, finiteness of every float, unique live keys, neighbour
-//! counts within capacity, neighbour ids in range, not self-referencing, and
-//! present on the layer they are linked on, and an entry point on the top
-//! level. Any violation is a [`FormatError`], never a panic.
+//! parameter ranges, every vector passing the same checks as
+//! [`HnswIndex::insert`] (finite, squared norm in range, unit length for
+//! cosine), unique live keys, neighbour counts within capacity, and neighbour
+//! ids in range, unique within their list, not self-referencing, and present
+//! on the layer they are linked on, and an entry point on the top level. Any
+//! violation is a [`FormatError`], never a panic.
 //!
-//! Allocation is bounded too. The node count is checked against the remaining
-//! input before anything is allocated, so every per-node array is
-//! proportional to the input. Adjacency storage is fixed-capacity per layer
-//! (see `graph.rs`), so its size follows from the node count, `M`, `M0` and
-//! the level column; the level column must be statistically plausible for the
-//! stored `mL`, so a file cannot claim that every node lives on 31 layers.
-//! Together, a file cannot make the loader allocate more than an honestly
-//! built index with the same parameters and node count would hold.
+//! Allocation is bounded in three steps, all before the graph storage is
+//! allocated:
+//!
+//! 1. Every column is located in the input (as a borrowed slice) before
+//!    anything is parsed out of it, so a node count larger than the input
+//!    fails as [`FormatError::Truncated`] without allocating.
+//! 2. The adjacency section is walked once without allocating: every
+//!    neighbour list must be present, with a count within its capacity. A
+//!    file therefore pays at least four bytes for every list it makes the
+//!    loader allocate.
+//! 3. Adjacency storage is fixed-capacity per layer (see `graph.rs`), so even
+//!    a complete file can describe an index much larger than itself: up to
+//!    `(M0 + 1) * 4` bytes of storage per four-byte count word. The heap size
+//!    of the described index is computed from the header and the level column
+//!    and compared with the caller's limit ([`Error::MemoryLimitExceeded`]).
+//!
+//! The level column must also be statistically plausible for the stored `mL`,
+//! which rejects files that put every node on dozens of layers early.
 
 use std::collections::HashMap;
 use std::io::{self, BufWriter, Write};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use super::{HnswIndex, MAX_LEVEL, NO_ENTRY, pack_entry, unpack_entry};
+use parking_lot::Mutex;
+
+use super::{HnswIndex, MAX_LEVEL, NO_ENTRY, key_map_heap_bytes, pack_entry, unpack_entry};
 use crate::crc32::{self, Crc32};
 use crate::quantization::ScalarQuantizer;
+use crate::vector;
 use crate::{Error, FormatError, HnswParams, MAX_DIM, MAX_NODES, Metric, NeighborSelection};
 
 const MAGIC: [u8; 8] = *b"HNSWIDX\0";
@@ -61,6 +76,11 @@ const TRAILER_LEN: usize = 4;
 const LEVEL_SUM_SLACK: f64 = 1024.0;
 /// Tolerance on `|‖v‖² − 1|` for stored cosine vectors.
 const UNIT_NORM_TOLERANCE: f64 = 1e-3;
+/// [`HnswIndex::from_bytes`] lets the loaded index hold up to this many times
+/// the input size...
+const DEFAULT_MEMORY_FACTOR: usize = 64;
+/// ...or this many bytes, whichever is larger.
+const DEFAULT_MEMORY_FLOOR: usize = 64 << 20;
 
 /// `Write` adapter that checksums everything written through it.
 struct CrcWriter<W> {
@@ -149,6 +169,7 @@ pub(super) fn write(index: &HnswIndex, writer: impl Write) -> io::Result<()> {
 }
 
 /// Bounds-checked little-endian reader over the checksummed body.
+#[derive(Clone)]
 struct Reader<'a> {
     buf: &'a [u8],
     pos: usize,
@@ -212,14 +233,25 @@ fn invalid(what: &'static str) -> Error {
     Error::Format(FormatError::Invalid(what))
 }
 
-pub(super) fn read(bytes: &[u8]) -> Result<HnswIndex, Error> {
+pub(super) fn read(bytes: &[u8], max_memory: usize) -> Result<HnswIndex, Error> {
     let body = verify_envelope(bytes)?;
     let mut r = Reader {
         buf: body,
         pos: MAGIC.len() + 4,
     };
     let header = read_header(&mut r)?;
-    let mut index = read_nodes(&mut r, &header)?;
+    let columns = read_columns(&mut r, &header)?;
+    // Nothing proportional to the graph has been allocated yet. Before it is,
+    // make sure the file really contains that graph and that it fits.
+    scan_links(r.clone(), columns.levels, &header.params)?;
+    let required = required_memory(&header, columns.level_sum);
+    if required > max_memory {
+        return Err(Error::MemoryLimitExceeded {
+            required,
+            limit: max_memory,
+        });
+    }
+    let mut index = read_nodes(&header, &columns)?;
     read_links(&mut r, &mut index)?;
     if header.quantized {
         let offset = r.finite_f32s(header.dim, "quantizer offset")?;
@@ -232,6 +264,14 @@ pub(super) fn read(bytes: &[u8]) -> Result<HnswIndex, Error> {
         return Err(FormatError::TrailingBytes.into());
     }
     finish(index, header.entry_id)
+}
+
+/// The default `max_memory` of [`HnswIndex::from_bytes`] for an input of
+/// `input_len` bytes.
+pub(super) fn default_memory_limit(input_len: usize) -> usize {
+    input_len
+        .saturating_mul(DEFAULT_MEMORY_FACTOR)
+        .max(DEFAULT_MEMORY_FLOOR)
 }
 
 /// Checks magic, version and checksum; returns the checksummed body.
@@ -320,64 +360,133 @@ fn read_header(r: &mut Reader<'_>) -> Result<Header, Error> {
     })
 }
 
-/// Reads the per-node columns and allocates (empty) adjacency storage.
-fn read_nodes(r: &mut Reader<'_>, h: &Header) -> Result<HnswIndex, Error> {
-    let (n, dim) = (h.node_count, h.dim);
-    // Every node needs at least: key, level, flag, vector, layer-0 count.
-    let min_node_bytes = 8 + 1 + 1 + 4 * dim + 4;
-    if n.checked_mul(min_node_bytes)
-        .is_none_or(|need| need > r.remaining())
-    {
-        return Err(FormatError::Truncated.into());
-    }
-    let keys: Vec<u64> = (0..n).map(|_| r.u64()).collect::<Result<_, _>>()?;
-    let levels = r.take(n)?.to_vec();
+/// The per-node columns, located in the input but not yet parsed.
+struct Columns<'a> {
+    keys: &'a [u8],
+    levels: &'a [u8],
+    flags: &'a [u8],
+    vectors: &'a [u8],
+    /// Sum of all node levels: the number of upper-layer neighbour lists.
+    level_sum: usize,
+}
+
+/// Locates the key, level, tombstone and vector columns and validates the
+/// level and tombstone bytes. Allocates nothing.
+fn read_columns<'a>(r: &mut Reader<'a>, h: &Header) -> Result<Columns<'a>, Error> {
+    let n = h.node_count;
+    let bytes = |width: usize| n.checked_mul(width).ok_or(FormatError::Truncated);
+    let keys = r.take(bytes(size_of::<u64>())?)?;
+    let levels = r.take(n)?;
+    let flags = r.take(n)?;
+    let vectors = r.take(bytes(size_of::<f32>() * h.dim)?)?;
     if levels.iter().any(|&l| l > MAX_LEVEL) {
         return Err(invalid("node level"));
     }
-    let deleted = r
-        .take(n)?
-        .iter()
-        .map(|&b| match b {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(invalid("tombstone flag")),
-        })
-        .collect::<Result<Vec<bool>, Error>>()?;
-    let vectors = r.finite_f32s(n * dim, "vector component")?;
-    if h.metric == Metric::Cosine
-        && vectors.chunks_exact(dim).any(|v| {
-            let norm_sq: f64 = v.iter().map(|&x| f64::from(x) * f64::from(x)).sum();
-            (norm_sq - 1.0).abs() > UNIT_NORM_TOLERANCE
-        })
-    {
-        return Err(invalid("cosine vector is not unit length"));
+    if flags.iter().any(|&f| f > 1) {
+        return Err(invalid("tombstone flag"));
     }
-
     // Levels follow P(level >= l) = exp(-l / mL), so their expected sum is
-    // n / (exp(1 / mL) - 1). Allow twice that plus slack before allocating
-    // upper-layer storage.
+    // n / (exp(1 / mL) - 1). Allow twice that plus slack.
     let level_sum: usize = levels.iter().map(|&l| usize::from(l)).sum();
     let expected = n as f64 / (1.0 / h.params.level_multiplier()).exp_m1();
     if level_sum as f64 > 2.0 * expected + LEVEL_SUM_SLACK {
         return Err(invalid("implausible level distribution"));
     }
+    Ok(Columns {
+        keys,
+        levels,
+        flags,
+        vectors,
+        level_sum,
+    })
+}
 
-    let mut index = HnswIndex::empty(dim, h.metric, h.params.clone());
-    index.reserve_nodes(n);
-    for &level in &levels {
+/// Walks the adjacency section without allocating: every neighbour list of
+/// every node must be present, with a count within the layer's capacity.
+/// Contents are validated later by [`read_links`].
+fn scan_links(mut r: Reader<'_>, levels: &[u8], params: &HnswParams) -> Result<(), Error> {
+    for &level in levels {
+        for layer in 0..=usize::from(level) {
+            let count = r.u32()? as usize;
+            let capacity = if layer == 0 { params.m0() } else { params.m() };
+            if count > capacity {
+                return Err(invalid("neighbour count exceeds capacity"));
+            }
+            r.take(count * size_of::<u32>())?;
+        }
+    }
+    Ok(())
+}
+
+/// Heap bytes of the index the file describes, as
+/// [`HnswIndex::memory_usage`] will report them once it is loaded. Saturates
+/// instead of overflowing.
+fn required_memory(h: &Header, level_sum: usize) -> usize {
+    let word = size_of::<AtomicU32>();
+    let code = if h.quantized { h.dim } else { 0 };
+    let per_node = size_of::<f32>() * h.dim
+        + size_of::<u64>()
+        + size_of::<u8>()
+        + size_of::<bool>()
+        + size_of::<Mutex<()>>()
+        + size_of::<Box<[AtomicU32]>>()
+        + (h.params.m0() + 1) * word
+        + code;
+    let quantizer = if h.quantized {
+        size_of::<f32>() * h.dim
+    } else {
+        0
+    };
+    h.node_count
+        .saturating_mul(per_node)
+        .saturating_add(level_sum.saturating_mul((h.params.m() + 1) * word))
+        .saturating_add(key_map_heap_bytes(h.node_count))
+        .saturating_add(quantizer)
+}
+
+/// Parses the per-node columns and allocates (empty) adjacency storage.
+fn read_nodes(h: &Header, c: &Columns<'_>) -> Result<HnswIndex, Error> {
+    let keys: Vec<u64> = c
+        .keys
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|b| u64::from_le_bytes(*b))
+        .collect();
+    let vectors: Vec<f32> = c
+        .vectors
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f32::from_le_bytes(*b))
+        .collect();
+    for v in vectors.chunks_exact(h.dim) {
+        // The checks `insert` applies, so that a loaded index only holds
+        // vectors `insert` would have accepted.
+        let norm_sq = vector::check(h.dim, v).map_err(|_| invalid("vector out of range"))?;
+        if h.metric == Metric::Cosine && (norm_sq - 1.0).abs() > UNIT_NORM_TOLERANCE {
+            return Err(invalid("cosine vector is not unit length"));
+        }
+    }
+
+    // The columns are moved in whole; only graph storage and locks are
+    // reserved, so nothing is allocated twice.
+    let mut index = HnswIndex::empty(h.dim, h.metric, h.params.clone());
+    index.links.reserve(h.node_count);
+    index.locks.reserve(h.node_count);
+    for &level in c.levels {
         index.push_node_storage(level);
     }
     index.keys = keys;
-    index.levels = levels;
-    index.deleted = deleted;
+    index.levels = c.levels.to_vec();
+    index.deleted = c.flags.iter().map(|&f| f == 1).collect();
     index.vectors = vectors;
     Ok(index)
 }
 
 fn read_links(r: &mut Reader<'_>, index: &mut HnswIndex) -> Result<(), Error> {
     let n = index.node_count();
-    let mut neighbors = Vec::new();
+    let (mut neighbors, mut sorted) = (Vec::new(), Vec::new());
     for id in 0..n {
         for layer in 0..=usize::from(index.levels[id]) {
             let count = r.u32()? as usize;
@@ -392,6 +501,11 @@ fn read_links(r: &mut Reader<'_>, index: &mut HnswIndex) -> Result<(), Error> {
                     return Err(invalid("neighbour id"));
                 }
                 neighbors.push(nb as u32);
+            }
+            sorted.clone_from(&neighbors);
+            sorted.sort_unstable();
+            if sorted.windows(2).any(|w| w[0] == w[1]) {
+                return Err(invalid("duplicate neighbour id"));
             }
             index.links.set(id as u32, layer, &neighbors);
         }

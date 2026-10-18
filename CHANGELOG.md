@@ -21,7 +21,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before
   `insert_batch` (rayon), `reserve`, concurrent `&self` search,
   `search_batch`.
 - Optional int8 scalar quantization with exact re-ranking.
-- Versioned, CRC-32 checksummed file format with a validating loader.
+- Versioned, CRC-32 checksummed file format with a validating loader that
+  checks the memory a file would need against a limit before allocating it
+  (`from_bytes_with_limit`, `Error::MemoryLimitExceeded`).
 - `BruteForceIndex` for exact ground truth, `eval::recall_at_k`, seeded
   synthetic datasets.
 - `hnsw-bench` binary, Criterion benches, examples, property tests and a

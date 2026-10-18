@@ -556,15 +556,13 @@ impl HnswIndex {
     /// hash map's exact bucket layout are estimated.
     #[must_use]
     pub fn memory_usage(&self) -> usize {
-        // hashbrown: one control byte per bucket and at most 7/8 load.
-        let map_buckets = (self.key_to_id.capacity() * 8 / 7).next_power_of_two();
         self.vectors.capacity() * size_of::<f32>()
             + self.keys.capacity() * size_of::<u64>()
             + self.levels.capacity()
             + self.deleted.capacity()
             + self.locks.capacity() * size_of::<Mutex<()>>()
             + self.links.heap_bytes()
-            + map_buckets * (size_of::<(u64, u32)>() + 1)
+            + key_map_heap_bytes(self.key_to_id.capacity())
             + self.scratch.heap_bytes()
             + self.quantized.as_ref().map_or(0, |q| {
                 q.codes.capacity() + size_of_val(q.quantizer.offset())
@@ -572,6 +570,8 @@ impl HnswIndex {
     }
 
     /// Serialises the index (format described in `docs/adr/0003`).
+    ///
+    /// Output is buffered internally, so `writer` need not be a `BufWriter`.
     ///
     /// # Errors
     ///
@@ -582,7 +582,11 @@ impl HnswIndex {
 
     /// Reads an index written by [`write_to`](Self::write_to).
     ///
-    /// The input is treated as untrusted; see [`from_bytes`](Self::from_bytes).
+    /// The whole stream is read into memory first (with
+    /// [`Read::read_to_end`]) and then parsed as by
+    /// [`from_bytes`](Self::from_bytes), so wrapping `reader` in a
+    /// `BufReader` gains nothing. For a stream from an untrusted source, cap
+    /// its length with [`Read::take`]; nothing else limits how much this reads.
     ///
     /// # Errors
     ///
@@ -609,15 +613,58 @@ impl HnswIndex {
     /// Parses and validates a serialised index.
     ///
     /// Checks the magic bytes, version and CRC-32, then every structural
-    /// invariant (ids in range, capacities, finiteness, unique keys, ...).
-    /// Corrupt or malicious input yields an error, never a panic, and cannot
-    /// make the loader allocate much more than the input size.
+    /// invariant (ids in range, capacities, vectors that
+    /// [`insert`](Self::insert) would accept, unique keys, ...). Corrupt or
+    /// malicious input yields an error, never a panic.
+    ///
+    /// The loaded index may hold at most 64 times `bytes.len()`, or 64 MiB if
+    /// that is larger, as reported by [`memory_usage`](Self::memory_usage).
+    /// Graph storage has a fixed capacity per node, so a small file can
+    /// describe a large index; the limit is checked before that storage is
+    /// allocated, so a hostile file gets an error instead of the memory.
+    /// Honestly built indexes need much less than the default; only a large
+    /// `M0` (above 256) or level multiplier combined with very
+    /// low-dimensional vectors may need
+    /// [`from_bytes_with_limit`](Self::from_bytes_with_limit).
     ///
     /// # Errors
     ///
-    /// [`Error::Format`] describing the first violation found.
+    /// [`Error::Format`] describing the first violation found, or
+    /// [`Error::MemoryLimitExceeded`].
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        io::read(bytes)
+        io::read(bytes, io::default_memory_limit(bytes.len()))
+    }
+
+    /// Like [`from_bytes`](Self::from_bytes), with an explicit limit on the
+    /// heap memory the loaded index may hold.
+    ///
+    /// The heap size of the index the file describes is computed from its
+    /// header and node levels, after checking that the file is complete and
+    /// before any graph storage is allocated; it is the figure
+    /// [`memory_usage`](Self::memory_usage) reports once the index is loaded.
+    /// Pass `usize::MAX` for no limit beyond the input itself.
+    ///
+    /// ```
+    /// use hnsw_index::{Error, HnswIndex, HnswParams, Metric};
+    ///
+    /// let mut index = HnswIndex::new(2, Metric::L2, HnswParams::default())?;
+    /// index.insert(1, &[0.5, 0.5])?;
+    /// let bytes = index.to_bytes();
+    ///
+    /// assert!(HnswIndex::from_bytes_with_limit(&bytes, 1 << 20).is_ok());
+    /// assert!(matches!(
+    ///     HnswIndex::from_bytes_with_limit(&bytes, 100),
+    ///     Err(Error::MemoryLimitExceeded { limit: 100, .. })
+    /// ));
+    /// # Ok::<(), Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// As for [`from_bytes`](Self::from_bytes); [`Error::MemoryLimitExceeded`]
+    /// if the index would need more than `max_memory` bytes.
+    pub fn from_bytes_with_limit(bytes: &[u8], max_memory: usize) -> Result<Self, Error> {
+        io::read(bytes, max_memory)
     }
 
     // ---- internals shared by the submodules ----
@@ -683,6 +730,16 @@ impl HnswIndex {
         }
         self.quantized = Some(Quantized { quantizer, codes });
     }
+}
+
+/// Heap bytes of a `HashMap<u64, u32>` with room for `capacity` entries,
+/// following hashbrown's layout: a power-of-two number of buckets at most 7/8
+/// full, each holding an entry and one control byte.
+fn key_map_heap_bytes(capacity: usize) -> usize {
+    let buckets = (capacity.saturating_mul(8) / 7)
+        .checked_next_power_of_two()
+        .unwrap_or(usize::MAX);
+    buckets.saturating_mul(size_of::<(u64, u32)>() + 1)
 }
 
 impl fmt::Debug for HnswIndex {
