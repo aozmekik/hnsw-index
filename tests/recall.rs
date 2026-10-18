@@ -49,17 +49,25 @@ fn gaussian_10k_recall_at_10_is_at_least_095_with_m32() {
     assert!(r >= 0.95, "recall@10 = {r}");
 }
 
-/// With the default `M = 16` the same data stays below 0.95 at `ef = 100`;
-/// hnswlib measures 0.889 on this exact dataset (`scripts/compare_hnswlib.py`),
-/// so this pins parity rather than an arbitrary target.
+/// hnswlib's recall@10 on this exact dataset with `M = 16`,
+/// `efConstruction = 200` and `ef = 100` (`scripts/compare_hnswlib.py`).
+const HNSWLIB_GAUSSIAN_10K_M16: f64 = 0.889;
+
+/// With the default `M = 16` the same data stays below 0.95 at `ef = 100`,
+/// for hnswlib too. This checks that the crate stays within 0.02 of
+/// hnswlib's figure, in both directions: a large change either way means the
+/// algorithm no longer matches the reference.
 #[test]
-fn gaussian_10k_m16_matches_reference_implementation() {
+fn gaussian_10k_m16_recall_is_within_002_of_hnswlib() {
     let data = gaussian_10k();
     let truth = ground_truth(&data, Metric::L2);
     let index = sequential(&data, Metric::L2, 16);
     let r = recall(&index, &data, &truth);
     eprintln!("gaussian 10k x 128, M=16, sequential build: recall@10 = {r:.4}");
-    assert!(r >= 0.87, "recall@10 = {r}");
+    assert!(
+        (r - HNSWLIB_GAUSSIAN_10K_M16).abs() <= 0.02,
+        "recall@10 = {r}, hnswlib {HNSWLIB_GAUSSIAN_10K_M16}"
+    );
 }
 
 #[test]

@@ -259,6 +259,18 @@ mod tests {
         assert_eq!(a, b);
         assert_ne!(a, c);
         assert!(a.iter().all(|&l| l <= MAX_LEVEL));
-        assert_eq!(sample_level(0, 0, 10.0).max(MAX_LEVEL), MAX_LEVEL);
+    }
+
+    #[test]
+    fn levels_are_capped() {
+        // With mL = 10, P(level >= 31) = exp(-3.1), about 4.5%, so some of
+        // 1000 nodes would exceed the cap without it.
+        let mut capped = 0;
+        for id in 0..1000 {
+            let level = sample_level(3, id, 10.0);
+            assert!(level <= MAX_LEVEL);
+            capped += usize::from(level == MAX_LEVEL);
+        }
+        assert!((10..100).contains(&capped), "{capped} nodes at the cap");
     }
 }
