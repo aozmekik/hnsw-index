@@ -313,6 +313,27 @@ fn filter_is_applied_during_traversal() {
 }
 
 #[test]
+fn filters_need_not_be_sync() {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    let data = Dataset::gaussian(500, 1, 8, 3);
+    let index = build(&data, Metric::L2, HnswParams::default(), false);
+    // `Rc` and `Cell` are neither `Send` nor `Sync`.
+    let allowed: Rc<HashSet<u64>> = Rc::new((0..500).filter(|k| k % 7 == 0).collect());
+    let calls = Cell::new(0_usize);
+    let hits = index
+        .search_filtered(data.query(0), 5, 32, |key| {
+            calls.set(calls.get() + 1);
+            allowed.contains(&key)
+        })
+        .unwrap();
+    assert_eq!(hits.len(), 5);
+    assert!(hits.iter().all(|h| allowed.contains(&h.key)));
+    assert!(calls.get() >= 5);
+}
+
+#[test]
 fn quantized_search_requires_quantizer_and_reranks_exactly() {
     let data = Dataset::gaussian(2000, 20, 32, 12);
     let mut index = build(&data, Metric::L2, HnswParams::default(), false);

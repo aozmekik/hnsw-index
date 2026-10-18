@@ -74,6 +74,7 @@ impl<'a> SearchOptions<'a> {
     ///
     /// The filter must be `Sync` so that one `SearchOptions` value can be
     /// shared by searches running on several threads.
+    /// [`HnswIndex::search_filtered`] has no such requirement.
     #[must_use]
     pub fn filter(mut self, filter: &'a (dyn Fn(u64) -> bool + Sync)) -> Self {
         self.filter = Some(filter);
@@ -409,6 +410,9 @@ impl HnswIndex {
     /// the matching subset (for example with a
     /// [`BruteForceIndex`](crate::BruteForceIndex)) can be faster.
     ///
+    /// The filter runs on the calling thread only, so it need not be `Sync`:
+    /// it may capture an `Rc` or a `RefCell`.
+    ///
     /// # Errors
     ///
     /// As for [`search`](Self::search).
@@ -417,9 +421,9 @@ impl HnswIndex {
         query: &[f32],
         k: usize,
         ef: usize,
-        filter: impl Fn(u64) -> bool + Sync,
+        filter: impl Fn(u64) -> bool,
     ) -> Result<Vec<Neighbor>, Error> {
-        self.search_with(query, k, &SearchOptions::new(ef).filter(&filter))
+        self.search_impl(query, k, ef, false, Some(&filter))
     }
 
     /// Search with explicit [`SearchOptions`].
@@ -434,8 +438,22 @@ impl HnswIndex {
         k: usize,
         options: &SearchOptions<'_>,
     ) -> Result<Vec<Neighbor>, Error> {
+        self.search_impl(query, k, options.ef, options.quantized, options.filter)
+    }
+
+    /// The search behind every public search method. Generic over the filter
+    /// so that only [`SearchOptions`], which may be shared between threads,
+    /// requires it to be `Sync`.
+    fn search_impl<F: Fn(u64) -> bool + ?Sized>(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef: usize,
+        quantized: bool,
+        filter: Option<&F>,
+    ) -> Result<Vec<Neighbor>, Error> {
         let query = prepare_query(self.metric, self.dim, query)?;
-        let quantized = match (options.quantized, &self.quantized) {
+        let quantized = match (quantized, &self.quantized) {
             (false, _) => None,
             (true, Some(q)) => Some(q),
             (true, None) => return Err(Error::QuantizationDisabled),
@@ -443,9 +461,9 @@ impl HnswIndex {
         if k == 0 || self.is_empty() {
             return Ok(Vec::new());
         }
-        let ef = options.ef.max(k);
+        let ef = ef.max(k);
         let admit = |id: u32| {
-            !self.deleted[id as usize] && options.filter.is_none_or(|f| f(self.keys[id as usize]))
+            !self.deleted[id as usize] && filter.is_none_or(|f| f(self.keys[id as usize]))
         };
         let exact = |id: u32| self.metric.distance(&self.kernels, &query, self.vector(id));
 
