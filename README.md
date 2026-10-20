@@ -57,13 +57,13 @@ Not yet published to crates.io. Use it as a git dependency:
 
 ```toml
 [dependencies]
-hnsw-index = { git = "https://github.com/aozmekik/hnsw-index" }
+hnsw-index = { git = "https://github.com/aozmekik/hnsw-index", tag = "v0.1.0" }
 ```
 
 The benchmark binary installs with
 
 ```sh
-cargo install --locked --git https://github.com/aozmekik/hnsw-index --bin hnsw-bench
+cargo install --locked --git https://github.com/aozmekik/hnsw-index --tag v0.1.0 --bin hnsw-bench
 ```
 
 (CI runs the same command against its own checkout.)
